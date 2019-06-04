@@ -653,5 +653,3 @@ else:
     pyplot.xlabel('time (microseconds)')
     pyplot.ylabel('Muon Polarisation')
     pyplot.show()
-
-print("version 2")
