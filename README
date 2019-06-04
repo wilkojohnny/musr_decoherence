@@ -7,4 +7,4 @@ Python program which calculates the direction of muon polarisation as a function
 DecoherenceCalculator.py - the main calculator
 TCoord3D.py - contains class TCoord3D which allows one do deal with 3D coordinates, in any prescribed basis
 MDecoherenceAtom.py - contains class TDecoherenceAtom which defines an object which is used for defining atoms (specifically nuclei)
-
+AtomObtainer.py - reads in atoms from files (eg pw.x output, .xtl)
