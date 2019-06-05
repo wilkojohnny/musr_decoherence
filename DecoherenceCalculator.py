@@ -9,6 +9,7 @@ import numpy.linalg as linalg  # for linear algebra
 import matplotlib.pyplot as pyplot      # for plotting
 from datetime import datetime  # for date and time printing in the output file
 from enum import Enum  # for enumerations for the inputs - makes everything a lot easier to read!
+import subprocess  # to get the current git version
 
 
 # class to define the enumerations for the different types of lattices available - same as pw.x
@@ -238,6 +239,10 @@ def file_preamble(file, muon_position, nnn_atoms, fourier, starttime=None, endti
 
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
+
+    # get the git version
+    version_label = subprocess.check_output(["git", "describe"]).strip()
+    file.writelines('! Using version ' + version_label + '\n!\n')
 
     # type of calculation
     if not fourier:
