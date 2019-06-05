@@ -168,12 +168,7 @@ def inc_isotope_id(basis, oldids=None):
 
 
 # make measurement operator for this spin
-def measure_ith_spin(i, pauli_matrix):
-    # make sure input is sensible
-    if i > N_spins:
-        i = N_spins
-    if i < 0:
-        i = 0
+def measure_ith_spin(Spins, i, pauli_matrix):
 
     # calculate the dimension of the identity matrix on the LHS ...
     lhs_dim = 1
@@ -189,21 +184,21 @@ def measure_ith_spin(i, pauli_matrix):
 
 
 # calculate the Hamiltonian for the i j pair
-def calc_hamiltonian_term(i, j):
+def calc_hamiltonian_term(spins, i, j):
     # calculate A
-    A = 1.05456e-5 * Spins[i].gyromag_ratio * Spins[j].gyromag_ratio
+    A = 1.05456e-5 * spins[i].gyromag_ratio * spins[j].gyromag_ratio
 
-    r = Spins[i].position - Spins[j].position
+    r = spins[i].position - spins[j].position
 
     # get all the operators we need
-    i_x = measure_ith_spin(i, Spins[i].pauli_x)
-    j_x = measure_ith_spin(j, Spins[j].pauli_x)
+    i_x = measure_ith_spin(spins, i, spins[i].pauli_x)
+    j_x = measure_ith_spin(spins, j, spins[j].pauli_x)
 
-    i_y = measure_ith_spin(i, Spins[i].pauli_y)
-    j_y = measure_ith_spin(j, Spins[j].pauli_y)
+    i_y = measure_ith_spin(spins, i, spins[i].pauli_y)
+    j_y = measure_ith_spin(spins, j, spins[j].pauli_y)
 
-    i_z = measure_ith_spin(i, Spins[i].pauli_z)
-    j_z = measure_ith_spin(j, Spins[j].pauli_z)
+    i_z = measure_ith_spin(spins, i, spins[i].pauli_z)
+    j_z = measure_ith_spin(spins, j, spins[j].pauli_z)
 
     # Calculate the hamiltonian!
     return A/pow(abs(r.r()), 3)*(i_x*j_x + i_y*j_y + i_z*j_z
@@ -212,18 +207,18 @@ def calc_hamiltonian_term(i, j):
 
 
 # calculate entire hamiltonian
-def calc_total_hamiltonian(Spins):
+def calc_total_hamiltonian(spins):
     current_hamiltonian = 0
 
     # calculate hamiltonian for each pair and add onto sum
-    for i in range(0, len(Spins)):
-        for j in range(i+1, len(Spins)):
-            current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(i, j)
+    for i in range(0, len(spins)):
+        for j in range(i+1, len(spins)):
+            current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
     return current_hamiltonian
 
 
 # calculate polarisation function for one specific time (used in the integration routine)
-def calc_p_average_t(t, amplitude, E):
+def calc_p_average_t(t, const, amplitude, E):
     # calculate the oscillating term
     osc_term = 0
     for isotope_combination in range(0, len(amplitude)):
@@ -237,7 +232,10 @@ def calc_p_average_t(t, amplitude, E):
 
 
 # do file preamble
-def file_preamble(file):
+def file_preamble(file, muon_position, nnn_atoms, fourier, starttime=None, endtime=None, timestep=None, fourier_2d=None,
+                  tol=None, use_xtl_input=None, xtl_input_location=None, use_pw_output=None, perturbed_distances=None,
+                  squish_radius=None,  nnnness=None, lattice_type=None, lattice_parameter=None):
+
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
@@ -301,355 +299,361 @@ def write_to_file(file, t, P):
     for i in range(0, len(t)-1):
         file.writelines(str(t[i]) + ' ' + str(P[i]) + '\n')
 
+def main():
+    #### INPUT ####
 
-#### INPUT ####
+    # output file location
+    outfile_location = 'Output/SnF2/SnF2_F2_F4_nnnnnnnn_Sn.dat'
 
-# output file location
-outfile_location = 'Output/SnF2/SnF2_F2_F4_nnnnnnnn_Sn.dat'
-
-# fourier calculation?
-fourier = False
-fourier_2d = False
-
-
-# if fourier calculation:
-tol = 1e-10  # maximum difference between energies for them to be considered the same
-# elif time calculation:
-starttime = 0
-timestep = 0.01
-endtime = 10
-# fi
-
-use_pw_output = False
-# ## IF WE'RE USING PW_OUTPUT
-pw_output_file_location = ''
-no_atoms = 8
-
-use_xtl_input = True
-## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
-xtl_input_location = 'SnF2_atomic_positions.xtl'
-# (don't forget to define nnnness!)
-
-squish_radius = 1.18  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    # fourier calculation?
+    fourier = False
+    fourier_2d = False
 
 
-## IF WE'RE NOT USING pw output:
-# nn, nnn, nnnn?
-nnnness = 8  # 2 = nn, 3 = nnn etc
+    # if fourier calculation:
+    tol = 1e-10  # maximum difference between energies for them to be considered the same
+    # elif time calculation:
+    starttime = 0
+    timestep = 0.01
+    endtime = 10
+    # fi
 
-## IF NOT PW NOR XTL:
-# lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
-lattice_type = ibrav.CUBIC_SC  # # can only do fcc and monoclinic (unique axis b)
-# lattice parameters and angles, in angstroms
-lattice_parameter = [5, 5, 5]  # [a, b, c]
-lattice_angles = [90, 90, 90]  # [alpha, beta, gamma] in **degrees**
+    use_pw_output = False
+    # ## IF WE'RE USING PW_OUTPUT
+    pw_output_file_location = ''
+    no_atoms = 8
 
-# are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
-input_coord_units = position_units.ALAT
+    use_xtl_input = True
+    ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
+    xtl_input_location = 'SnF2_atomic_positions.xtl'
+    # (don't forget to define nnnness!)
 
-# atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=70.762,
-                #      II=3, name='Na', abundance=1),
-                 atom(coord.TCoord3D(.75, 0, 0), gyromag_ratio=251.713, II=1, name='F')]
-# register the perturbed distances
-perturbed_distances = []
-# define muon position
-muon_position = coord.TCoord3D(.5, 0, 0)
+    squish_radius = 1.18  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
 
-### END OF INPUT ###
+    ## IF WE'RE NOT USING pw output:
+    # nn, nnn, nnnn?
+    nnnness = 2  # 2 = nn, 3 = nnn etc
 
-# if told to use both pw and xtf, exit
-if use_pw_output and use_xtl_input:
-    print('Cannot use pw and xtl inputs simultaneously. Aborting...')
-    exit()
+    ## IF NOT PW NOR XTL:
+    # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
+    lattice_type = ibrav.CUBIC_SC  # # can only do fcc and monoclinic (unique axis b)
+    # lattice parameters and angles, in angstroms
+    lattice_parameter = [5, 5, 5]  # [a, b, c]
+    lattice_angles = [90, 90, 90]  # [alpha, beta, gamma] in **degrees**
 
-if use_pw_output:
-    # get the atoms from the Quantum Espresso pw.x output, and put into an array
-    muon, all_atoms = AtomObtainer.get_atoms_from_pw_output(pw_output_file_location, no_atoms)
-    All_Spins = [muon]
-    for each_atom in all_atoms:
-        All_Spins.append(each_atom)
-    muon_position = muon.position
-else:
-    if not use_xtl_input:
-        # define a b, c, alpha, beta, gamma for clarity
-        a = lattice_parameter[0]
-        b = lattice_parameter[1]
-        c = lattice_parameter[2]
-        alpha = lattice_angles[0]*np.pi/180.
-        beta = lattice_angles[1]*np.pi/180.
-        gamma = lattice_angles[2]*np.pi/180.
+    # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
+    input_coord_units = position_units.ALAT
 
-        # type of calculation - can't do fourier2d if not fourier
-        fourier_2d = fourier_2d and fourier
+    # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
+    atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=70.762,
+                    #      II=3, name='Na', abundance=1),
+                     atom(coord.TCoord3D(.75, 0, 0), gyromag_ratio=251.713, II=1, name='F')]
+    # register the perturbed distances
+    perturbed_distances = []
+    # define muon position
+    muon_position = coord.TCoord3D(.5, 0, 0)
 
-        # define primitive vectors a1, a2 and a3, from pw.x input description
-        if lattice_type == ibrav.CUBIC_SC:
-            # simple cubic
-            a1 = coord.TCoord3D(a, 0, 0)
-            a2 = coord.TCoord3D(0, a, 0)
-            a3 = coord.TCoord3D(0, 0, a)
-        elif lattice_type == ibrav.CUBIC_FCC:
-            # fcc cubic
-            a1 = coord.TCoord3D(-a*.5, 0, a*.5)
-            a2 = coord.TCoord3D(0, a*.5, a*.5)
-            a3 = coord.TCoord3D(-a*.5, a*.5, 0)
-        elif lattice_type == ibrav.CUBIC_BCC:
-            a1 = coord.TCoord3D(.5*a, .5*a, .5*a)
-            a2 = coord.TCoord3D(-.5*a, .5*a, .5*a)
-            a3 = coord.TCoord3D(-.5*a, -.5*a, .5*a)
-        elif lattice_type == ibrav.CUBIC_BCC_EXTRA:
-            a1 = coord.TCoord3D(-.5*a, .5*a, .5*a)
-            a2 = coord.TCoord3D(.5*a, -.5*a, .5*a)
-            a3 = coord.TCoord3D(.5*a, .5*a, -.5*a)
-        elif lattice_type == ibrav.MONOCLINIC_UB:
-            # monoclinic, unique axis b
-            a1 = coord.TCoord3D(a, 0, 0)
-            a2 = coord.TCoord3D(0, b, 0)
-            a3 = coord.TCoord3D(c*np.cos(beta), 0, c*np.sin(beta))
-        else:
-            a1 = coord.TCoord3D(.5, .5, 0)
-            a2 = coord.TCoord3D(.5, 0, .5)
-            a3 = coord.TCoord3D(0, .5, .5)
 
-        primitive_lattice_vectors = [a1, a2, a3]
+    ### END OF INPUT ###
 
-        # sort out the basis issues (this is just to avoid clogging the input area!)
-        if input_coord_units == position_units.CRYSTAL:
-            # CRYSTAL units: everything is in terms of crystal vectors
-            # this means that the basis for the vectors is indeed the PLV - so change the position of the atoms to take
-            # this into account in all coordinates
+    # if told to use both pw and xtf, exit
+    if use_pw_output and use_xtl_input:
+        print('Cannot use pw and xtl inputs simultaneously. Aborting...')
+        exit()
 
-            # sort out the atoms:
-            for basis_atom in atomic_basis:
-                basis_atom.position.set_basis(primitive_lattice_vectors)
-
-            # sort out the perturbed pairs
-            for perturbed_pair in perturbed_distances:
-                perturbed_pair[0].set_basis(primitive_lattice_vectors)
-                perturbed_pair[1].set_basis(primitive_lattice_vectors)
-
-            # finally, do the muon
-            muon_position.set_basis(primitive_lattice_vectors)
-        elif input_coord_units == position_units.ALAT:
-            # don't bother with basis if ALAT - just multiply all the coordinates by a!
-            # sort out the atoms:
-            for basis_atom in atomic_basis:
-                basis_atom.position = basis_atom.position*a
-
-            # sort out the perturbed pairs
-            for perturbed_pair in perturbed_distances:
-                perturbed_pair[0] = perturbed_pair[0]*a
-                perturbed_pair[1] = perturbed_pair[1]*a
-
-            # finally, do the muon
-            muon_position = muon_position*a
-        else:
-            # we're in cartesian-land with the distances given in angstroms - so do nothing!
-            pass
-
-        # create muon
-        muon = atom(muon_position, gyromag_ratio=851.372, II=1, name='mu')
-    else:
-        # import the fractional coordinates from the XTL
-        muon, atomic_basis, [a1, a2, a3] = AtomObtainer.get_atoms_from_xtl(xtl_file_location=xtl_input_location)
-        lattice_type = ibrav.OTHER
+    if use_pw_output:
+        # get the atoms from the Quantum Espresso pw.x output, and put into an array
+        muon, nnn_atoms = AtomObtainer.get_atoms_from_pw_output(pw_output_file_location, no_atoms)
+        All_Spins = [muon]
+        for each_atom in nnn_atoms:
+            All_Spins.append(each_atom)
         muon_position = muon.position
+    else:
+        if not use_xtl_input:
+            # define a b, c, alpha, beta, gamma for clarity
+            a = lattice_parameter[0]
+            b = lattice_parameter[1]
+            c = lattice_parameter[2]
+            alpha = lattice_angles[0]*np.pi/180.
+            beta = lattice_angles[1]*np.pi/180.
+            gamma = lattice_angles[2]*np.pi/180.
 
-    # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
-    nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, perturbed_distances, squish_radius)
+            # type of calculation - can't do fourier2d if not fourier
+            fourier_2d = fourier_2d and fourier
 
-    # as before, make a list of spins to calculate (including that of the muon)
-    All_Spins = [muon]
-    for i_atom in nnn_atoms:
-        All_Spins.append(atom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
+            # define primitive vectors a1, a2 and a3, from pw.x input description
+            if lattice_type == ibrav.CUBIC_SC:
+                # simple cubic
+                a1 = coord.TCoord3D(a, 0, 0)
+                a2 = coord.TCoord3D(0, a, 0)
+                a3 = coord.TCoord3D(0, 0, a)
+            elif lattice_type == ibrav.CUBIC_FCC:
+                # fcc cubic
+                a1 = coord.TCoord3D(-a*.5, 0, a*.5)
+                a2 = coord.TCoord3D(0, a*.5, a*.5)
+                a3 = coord.TCoord3D(-a*.5, a*.5, 0)
+            elif lattice_type == ibrav.CUBIC_BCC:
+                a1 = coord.TCoord3D(.5*a, .5*a, .5*a)
+                a2 = coord.TCoord3D(-.5*a, .5*a, .5*a)
+                a3 = coord.TCoord3D(-.5*a, -.5*a, .5*a)
+            elif lattice_type == ibrav.CUBIC_BCC_EXTRA:
+                a1 = coord.TCoord3D(-.5*a, .5*a, .5*a)
+                a2 = coord.TCoord3D(.5*a, -.5*a, .5*a)
+                a3 = coord.TCoord3D(.5*a, .5*a, -.5*a)
+            elif lattice_type == ibrav.MONOCLINIC_UB:
+                # monoclinic, unique axis b
+                a1 = coord.TCoord3D(a, 0, 0)
+                a2 = coord.TCoord3D(0, b, 0)
+                a3 = coord.TCoord3D(c*np.cos(beta), 0, c*np.sin(beta))
+            else:
+                a1 = coord.TCoord3D(.5, .5, 0)
+                a2 = coord.TCoord3D(.5, 0, .5)
+                a3 = coord.TCoord3D(0, .5, .5)
 
-# print the atoms in the list
-for i_atom in All_Spins:
-    print(i_atom)
+            primitive_lattice_vectors = [a1, a2, a3]
 
-# turn the spins into a muon-centred basis
-for spin in All_Spins:
-    for isotopeid in range(0, len(spin)):
-        spin[isotopeid].position = spin[isotopeid].position - muon_position
+            # sort out the basis issues (this is just to avoid clogging the input area!)
+            if input_coord_units == position_units.CRYSTAL:
+                # CRYSTAL units: everything is in terms of crystal vectors
+                # this means that the basis for the vectors is indeed the PLV - so change the position of the atoms to take
+                # this into account in all coordinates
 
-# count number of spins
-N_spins = len(All_Spins) - 1
+                # sort out the atoms:
+                for basis_atom in atomic_basis:
+                    basis_atom.position.set_basis(primitive_lattice_vectors)
 
-# count the number of combinations of isotopes
-isotope_combinations = 1
-for atoms in All_Spins:
-    isotope_combinations = isotope_combinations*len(atoms)
-print(str(isotope_combinations) + ' isotope combination(s) found')
+                # sort out the perturbed pairs
+                for perturbed_pair in perturbed_distances:
+                    perturbed_pair[0].set_basis(primitive_lattice_vectors)
+                    perturbed_pair[1].set_basis(primitive_lattice_vectors)
 
-# put all these number of isotopes into an array
-number_isotopes = [len(atom) for atom in All_Spins]
+                # finally, do the muon
+                muon_position.set_basis(primitive_lattice_vectors)
+            elif input_coord_units == position_units.ALAT:
+                # don't bother with basis if ALAT - just multiply all the coordinates by a!
+                # sort out the atoms:
+                for basis_atom in atomic_basis:
+                    basis_atom.position = basis_atom.position*a
 
-current_isotope_ids = inc_isotope_id(basis=number_isotopes)
+                # sort out the perturbed pairs
+                for perturbed_pair in perturbed_distances:
+                    perturbed_pair[0] = perturbed_pair[0]*a
+                    perturbed_pair[1] = perturbed_pair[1]*a
 
-# create frequency and amplitude arrays
-E = list()
-amplitude = list()
-const = 0
-while current_isotope_ids[0] != -1:  # the end signal is emitted by making the id of 0 = -1
-    # put this combination of isotopes into an array (Spins), and calculate probability of this state
-    probability = 1.
-    Spins = []
-    for atomid in range(0, len(All_Spins)):
-        Spins.append(All_Spins[atomid][current_isotope_ids[atomid]])
-        probability = probability * All_Spins[atomid][current_isotope_ids[atomid]].abundance
+                # finally, do the muon
+                muon_position = muon_position*a
+            else:
+                # we're in cartesian-land with the distances given in angstroms - so do nothing!
+                pass
 
-    # create measurement operators for the muon's spin
-    muon_spin_x = measure_ith_spin(0, Spins[0].pauli_x)
-    muon_spin_y = measure_ith_spin(0, Spins[0].pauli_y)
-    muon_spin_z = measure_ith_spin(0, Spins[0].pauli_z)
-
-    # calculate hamiltonian
-    hamiltonian = calc_total_hamiltonian(Spins)
-
-    # find eigenvalues and eigenvectors of hamiltonian
-    print("Finding eigenvalues...")
-    dense_hamiltonian = hamiltonian.todense()
-    this_E, R = linalg.eigh(dense_hamiltonian)
-    Rinv = R.H
-    print("Found eigenvalues:")
-    print(this_E)
-
-    # Calculate constant (lab book page 105)
-    thisconst = 0
-    for i in range(0, len(R)):
-        thisconst = thisconst + pow(abs(Rinv[i]*muon_spin_x*R[:, i]), 2) \
-                        + pow(abs(Rinv[i]*muon_spin_y*R[:, i]), 2) \
-                        + pow(abs(Rinv[i]*muon_spin_z*R[:, i]), 2)
-    const = const + probability*thisconst/(6*(muon_spin_x.shape[0]/2))
-
-    this_amplitude = np.zeros((len(R), len(R)))
-    # now calculate oscillating term
-    for i in range(0, len(R)):
-        Rx = Rinv[i] * muon_spin_x
-        Ry = Rinv[i] * muon_spin_y
-        Rz = Rinv[i] * muon_spin_z
-        print(str(100*i/len(R)) + '% complete...')
-        if fourier_2d:
-            jmin = 0
+            # create muon
+            muon = atom(muon_position, gyromag_ratio=851.372, II=1, name='mu')
         else:
-            jmin = i+1
-        for j in range(jmin, len(R)):
-            this_amplitude[i][j] = (pow(abs(Rx*R[:, j]), 2)
-                                    + pow(abs(Ry*R[:, j]), 2)
-                                    + pow(abs(Rz*R[:, j]), 2))*probability / (3*(muon_spin_x.shape[0]/2))
+            # import the fractional coordinates from the XTL
+            muon, atomic_basis, [a1, a2, a3] = AtomObtainer.get_atoms_from_xtl(xtl_file_location=xtl_input_location)
+            lattice_type = ibrav.OTHER
+            muon_position = muon.position
 
-    amplitude.append(this_amplitude.tolist())
-    E.append(this_E.tolist())
+        # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
+        nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, perturbed_distances, squish_radius)
 
-    # increment the isotope ids
-    current_isotope_ids = inc_isotope_id(basis=number_isotopes, oldids=current_isotope_ids)
+        # as before, make a list of spins to calculate (including that of the muon)
+        All_Spins = [muon]
+        for i_atom in nnn_atoms:
+            All_Spins.append(atom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
 
+    # print the atoms in the list
+    for i_atom in All_Spins:
+        print(i_atom)
 
-## OUTPUT ##
+    # turn the spins into a muon-centred basis
+    for spin in All_Spins:
+        for isotopeid in range(0, len(spin)):
+            spin[isotopeid].position = spin[isotopeid].position - muon_position
 
+    # count number of spins
+    N_spins = len(All_Spins) - 1
 
-# open file
-outfile = open(outfile_location, "w")
-# do preamble
-file_preamble(outfile)
+    # count the number of combinations of isotopes
+    isotope_combinations = 1
+    for atoms in All_Spins:
+        isotope_combinations = isotope_combinations*len(atoms)
+    print(str(isotope_combinations) + ' isotope combination(s) found')
 
-if fourier:
-    if fourier_2d:
-        outfile.writelines('! frequency1 frequency2 amplitude \n')
-    else:
-        outfile.writelines('! frequency amplitude \n')
+    # put all these number of isotopes into an array
+    number_isotopes = [len(atom) for atom in All_Spins]
 
-    # dump all into an array
-    fourier = []
+    current_isotope_ids = inc_isotope_id(basis=number_isotopes)
 
-    # for each isotope
-    for isotope_combination in range(0, len(amplitude)):
-        # noinspection PyTypeChecker
-        for i in range(0, len(E[isotope_combination])):
+    # create frequency and amplitude arrays
+    E = list()
+    amplitude = list()
+    const = 0
+    while current_isotope_ids[0] != -1:  # the end signal is emitted by making the id of 0 = -1
+        # put this combination of isotopes into an array (Spins), and calculate probability of this state
+        probability = 1.
+        Spins = []
+        for atomid in range(0, len(All_Spins)):
+            Spins.append(All_Spins[atomid][current_isotope_ids[atomid]])
+            probability = probability * All_Spins[atomid][current_isotope_ids[atomid]].abundance
+
+        # create measurement operators for the muon's spin
+        muon_spin_x = measure_ith_spin(Spins, 0, Spins[0].pauli_x)
+        muon_spin_y = measure_ith_spin(Spins, 0, Spins[0].pauli_y)
+        muon_spin_z = measure_ith_spin(Spins, 0, Spins[0].pauli_z)
+
+        # calculate hamiltonian
+        hamiltonian = calc_total_hamiltonian(Spins)
+
+        # find eigenvalues and eigenvectors of hamiltonian
+        print("Finding eigenvalues...")
+        dense_hamiltonian = hamiltonian.todense()
+        this_E, R = linalg.eigh(dense_hamiltonian)
+        Rinv = R.H
+        print("Found eigenvalues:")
+        print(this_E)
+
+        # Calculate constant (lab book page 105)
+        thisconst = 0
+        for i in range(0, len(R)):
+            thisconst = thisconst + pow(abs(Rinv[i]*muon_spin_x*R[:, i]), 2) \
+                            + pow(abs(Rinv[i]*muon_spin_y*R[:, i]), 2) \
+                            + pow(abs(Rinv[i]*muon_spin_z*R[:, i]), 2)
+        const = const + probability*thisconst/(6*(muon_spin_x.shape[0]/2))
+
+        this_amplitude = np.zeros((len(R), len(R)))
+        # now calculate oscillating term
+        for i in range(0, len(R)):
+            Rx = Rinv[i] * muon_spin_x
+            Ry = Rinv[i] * muon_spin_y
+            Rz = Rinv[i] * muon_spin_z
+            print(str(100*i/len(R)) + '% complete...')
             if fourier_2d:
-                # noinspection PyTypeChecker
-                for j in range(0, len(E[isotope_combination])):
-                    fourier.append((amplitude[isotope_combination][i][j], E[isotope_combination][i], E[isotope_combination][j]))
+                jmin = 0
             else:
-                # noinspection PyTypeChecker
-                for j in range(i + 1, len(E[isotope_combination])):
-                    fourier.append((amplitude[isotope_combination][i][j], abs(E[isotope_combination][i] - E[isotope_combination][j])))
+                jmin = i+1
+            for j in range(jmin, len(R)):
+                this_amplitude[i][j] = (pow(abs(Rx*R[:, j]), 2)
+                                        + pow(abs(Ry*R[:, j]), 2)
+                                        + pow(abs(Rz*R[:, j]), 2))*probability / (3*(muon_spin_x.shape[0]/2))
 
-    # go through the frequencies, if there's degenerate eigenvalues then add together the amplitudes
-    if fourier_2d:
-        fourier = sorted(fourier, key=lambda frequency: (frequency[1], frequency[2]))
-        i = 0
-        while i < len(fourier)-1:
-            # test for degeneracy (up to a tolerance for machine precision)
-            if (abs((fourier[i][1]) - (fourier[i+1][1])) < tol) and (abs(fourier[i][2] - fourier[i+1][2]) < tol):
-                # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                    fourier[i] = (fourier[i][0] + fourier[i + 1][0], fourier[i][1], fourier[i][2])
+        amplitude.append(this_amplitude.tolist())
+        E.append(this_E.tolist())
+
+        # increment the isotope ids
+        current_isotope_ids = inc_isotope_id(basis=number_isotopes, oldids=current_isotope_ids)
+
+
+    ## OUTPUT ##
+
+
+    # open file
+    outfile = open(outfile_location, "w")
+    # do preamble
+    file_preamble(outfile, muon_position, nnn_atoms, fourier, starttime, endtime, timestep, fourier_2d, tol,
+                  use_xtl_input, xtl_input_location, use_pw_output, perturbed_distances, squish_radius, nnnness,
+                  lattice_type, lattice_parameter)
+
+    if fourier:
+        if fourier_2d:
+            outfile.writelines('! frequency1 frequency2 amplitude \n')
+        else:
+            outfile.writelines('! frequency amplitude \n')
+
+        # dump all into an array
+        fourier = []
+
+        # for each isotope
+        for isotope_combination in range(0, len(amplitude)):
+            # noinspection PyTypeChecker
+            for i in range(0, len(E[isotope_combination])):
+                if fourier_2d:
+                    # noinspection PyTypeChecker
+                    for j in range(0, len(E[isotope_combination])):
+                        fourier.append((amplitude[isotope_combination][i][j], E[isotope_combination][i], E[isotope_combination][j]))
+                else:
+                    # noinspection PyTypeChecker
+                    for j in range(i + 1, len(E[isotope_combination])):
+                        fourier.append((amplitude[isotope_combination][i][j], abs(E[isotope_combination][i] - E[isotope_combination][j])))
+
+        # go through the frequencies, if there's degenerate eigenvalues then add together the amplitudes
+        if fourier_2d:
+            fourier = sorted(fourier, key=lambda frequency: (frequency[1], frequency[2]))
+            i = 0
+            while i < len(fourier)-1:
+                # test for degeneracy (up to a tolerance for machine precision)
+                if (abs((fourier[i][1]) - (fourier[i+1][1])) < tol) and (abs(fourier[i][2] - fourier[i+1][2]) < tol):
+                    # degenerate eigenvalue: add the amplitudes, keep frequency the same
+                        fourier[i] = (fourier[i][0] + fourier[i + 1][0], fourier[i][1], fourier[i][2])
+                        # remove the i+1th (degenerate) eigenvalue
+                        del fourier[i + 1]
+                else:
+                    i = i + 1
+            # and sort and dedegenerate again...
+            fourier = sorted(fourier, key=lambda frequency: (frequency[2], frequency[1]))
+            i = 0
+            while i < len(fourier)-1:
+                # test for degeneracy (up to a tolerance for machine precision)
+                if (abs(fourier[i][1] - fourier[i+1][1]) < tol) and (abs(fourier[i][2] - fourier[i+1][2]) < tol):
+                    # degenerate eigenvalue: add the amplitudes, keep frequency the same
+                        fourier[i] = (fourier[i][0] + fourier[i + 1][0], fourier[i][1], fourier[i][2])
+                        # remove the i+1th (degenerate) eigenvalue
+                        del fourier[i + 1]
+                else:
+                    i = i + 1
+        else:
+            fourier = sorted(fourier, key=lambda frequency: frequency[1])
+            i = 0
+            while i < len(fourier)-1:
+                # test for degeneracy (up to a tolerance for machine precision)
+                if abs((fourier[i][1]) - (fourier[i+1][1])) < tol:
+                    # degenerate eigenvalue: add the amplitudes, keep frequency the same
+                    fourier[i] = (fourier[i][0] + fourier[i+1][0], fourier[i][1])
                     # remove the i+1th (degenerate) eigenvalue
-                    del fourier[i + 1]
-            else:
-                i = i + 1
-        # and sort and dedegenerate again...
-        fourier = sorted(fourier, key=lambda frequency: (frequency[2], frequency[1]))
-        i = 0
-        while i < len(fourier)-1:
-            # test for degeneracy (up to a tolerance for machine precision)
-            if (abs(fourier[i][1] - fourier[i+1][1]) < tol) and (abs(fourier[i][2] - fourier[i+1][2]) < tol):
-                # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                    fourier[i] = (fourier[i][0] + fourier[i + 1][0], fourier[i][1], fourier[i][2])
-                    # remove the i+1th (degenerate) eigenvalue
-                    del fourier[i + 1]
-            else:
-                i = i + 1
+                    del fourier[i+1]
+                else:
+                    i = i + 1
+
+            i = 0
+            # now remove any amplitudes which are less than 1e-15
+            while i < len(fourier)-1:
+                if abs(fourier[i][0]) < 1e-15:
+                    # remove the entry
+                    del fourier[i]
+                else:
+                    i = i + 1
+
+        # dump into file
+        if fourier_2d:
+            outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0]) + '\n'
+                                for fourier_entry in fourier])
+        else:
+            outfile.writelines('0 ' + str(const[0, 0]) + '\n')
+            outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[0]) + '\n' for fourier_entry in fourier])
+        outfile.close()
     else:
-        fourier = sorted(fourier, key=lambda frequency: frequency[1])
-        i = 0
-        while i < len(fourier)-1:
-            # test for degeneracy (up to a tolerance for machine precision)
-            if abs((fourier[i][1]) - (fourier[i+1][1])) < tol:
-                # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                fourier[i] = (fourier[i][0] + fourier[i+1][0], fourier[i][1])
-                # remove the i+1th (degenerate) eigenvalue
-                del fourier[i+1]
-            else:
-                i = i + 1
+        outfile.writelines('! t P_average \n')
+        P_average = []
+        t = np.arange(starttime, endtime, timestep)
 
-        i = 0
-        # now remove any amplitudes which are less than 1e-15
-        while i < len(fourier)-1:
-            if abs(fourier[i][0]) < 1e-15:
-                # remove the entry
-                del fourier[i]
-            else:
-                i = i + 1
+        # calculate each time separately
+        for time in np.nditer(t):
+            print("t=" + str(time))
+            P_average.append(calc_p_average_t(time, const, amplitude, E).max())
+            # print(P_average[-1])
 
-    # dump into file
-    if fourier_2d:
-        outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0]) + '\n'
-                            for fourier_entry in fourier])
-    else:
-        outfile.writelines('0 ' + str(const[0, 0]) + '\n')
-        outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[0]) + '\n' for fourier_entry in fourier])
-    outfile.close()
-else:
-    outfile.writelines('! t P_average \n')
-    P_average = []
-    t = np.arange(starttime, endtime, timestep)
+        # dump results in a file
+        write_to_file(outfile, t, P_average)
+        outfile.close()
 
-    # calculate each time separately
-    for time in np.nditer(t):
-        print("t=" + str(time))
-        P_average.append(calc_p_average_t(time, amplitude, E).max())
-        # print(P_average[-1])
+        # plot the angular averaged muon polarisation
+        pyplot.plot(t, P_average)
+        pyplot.title('Muon Polarisation')
+        pyplot.xlabel('time (microseconds)')
+        pyplot.ylabel('Muon Polarisation')
+        pyplot.show()
 
-    # dump results in a file
-    write_to_file(outfile, t, P_average)
-    outfile.close()
 
-    # plot the angular averaged muon polarisation
-    pyplot.plot(t, P_average)
-    pyplot.title('Muon Polarisation')
-    pyplot.xlabel('time (microseconds)')
-    pyplot.ylabel('Muon Polarisation')
-    pyplot.show()
+if __name__ == '__main__':
+    main()
