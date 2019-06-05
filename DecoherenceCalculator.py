@@ -241,8 +241,8 @@ def file_preamble(file, muon_position, nnn_atoms, fourier, starttime=None, endti
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
     # get the git version
-    version_label = subprocess.check_output(["git", "describe"]).strip()
-    file.writelines('! Using version ' + version_label + '\n!\n')
+    version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
+    file.writelines('! Using version ' + str(version_label) + '\n!\n')
 
     # type of calculation
     if not fourier:
@@ -304,11 +304,12 @@ def write_to_file(file, t, P):
     for i in range(0, len(t)-1):
         file.writelines(str(t[i]) + ' ' + str(P[i]) + '\n')
 
+
 def main():
     #### INPUT ####
 
     # output file location
-    outfile_location = 'Output/SnF2/SnF2_F2_F4_nnnnnnnn_Sn.dat'
+    outfile_location = 'Output/F_linear.dat'
 
     # fourier calculation?
     fourier = False
@@ -328,32 +329,33 @@ def main():
     pw_output_file_location = ''
     no_atoms = 8
 
-    use_xtl_input = True
+    use_xtl_input = False
     ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
     xtl_input_location = 'SnF2_atomic_positions.xtl'
     # (don't forget to define nnnness!)
 
-    squish_radius = 1.18  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    squish_radius = None  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
-    nnnness = 2  # 2 = nn, 3 = nnn etc
+    nnnness = 3  # 2 = nn, 3 = nnn etc
 
     ## IF NOT PW NOR XTL:
     # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
-    lattice_type = ibrav.CUBIC_SC  # # can only do fcc and monoclinic (unique axis b)
+    lattice_type = ibrav.OTHER  # # can only do fcc and monoclinic (unique axis b)
     # lattice parameters and angles, in angstroms
-    lattice_parameter = [5, 5, 5]  # [a, b, c]
+    lattice_parameter = [2.36, 0, 0]  # [a, b, c]
     lattice_angles = [90, 90, 90]  # [alpha, beta, gamma] in **degrees**
+    a1 = coord.TCoord3D(2.36, 0, 0)
+    a2 = coord.TCoord3D(0, 99, 0)
+    a3 = coord.TCoord3D(0, 0, 99)
 
     # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
     input_coord_units = position_units.ALAT
 
     # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-    atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=70.762,
-                    #      II=3, name='Na', abundance=1),
-                     atom(coord.TCoord3D(.75, 0, 0), gyromag_ratio=251.713, II=1, name='F')]
+    atomic_basis = [atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=251.713, II=1, name='F')]
     # register the perturbed distances
     perturbed_distances = []
     # define muon position
@@ -362,7 +364,7 @@ def main():
 
     ### END OF INPUT ###
 
-    # if told to use both pw and xtf, exit
+    # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
         print('Cannot use pw and xtl inputs simultaneously. Aborting...')
         exit()
@@ -411,10 +413,11 @@ def main():
                 a1 = coord.TCoord3D(a, 0, 0)
                 a2 = coord.TCoord3D(0, b, 0)
                 a3 = coord.TCoord3D(c*np.cos(beta), 0, c*np.sin(beta))
+            elif lattice_type == ibrav.OTHER:
+                # other lattice type - a1 a2 a3 defined manually - so don't worry
+                pass
             else:
-                a1 = coord.TCoord3D(.5, .5, 0)
-                a2 = coord.TCoord3D(.5, 0, .5)
-                a3 = coord.TCoord3D(0, .5, .5)
+                assert False
 
             primitive_lattice_vectors = [a1, a2, a3]
 
