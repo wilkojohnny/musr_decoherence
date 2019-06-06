@@ -233,7 +233,7 @@ def calc_p_average_t(t, const, amplitude, E):
 
 
 # do file preamble
-def file_preamble(file, muon_position, nnn_atoms, fourier, starttime=None, endtime=None, timestep=None, fourier_2d=None,
+def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None, fourier_2d=None,
                   tol=None, use_xtl_input=None, xtl_input_location=None, use_pw_output=None, perturbed_distances=None,
                   squish_radius=None,  nnnness=None, lattice_type=None, lattice_parameter=None):
 
@@ -264,8 +264,8 @@ def file_preamble(file, muon_position, nnn_atoms, fourier, starttime=None, endti
         file.writelines('! Atom positional data was obtained from QE PWSCF file: ' + xtl_input_location + '\n')
 
     # Basis atoms, with gyromag ratios and I values
-    for atom in nnn_atoms:
-        lines_to_write = atom[2].verbose_description(gle_friendly=True)
+    for atom in nn_atoms:
+        lines_to_write = atom.verbose_description(gle_friendly=True)
         for line in lines_to_write:
             file.writelines(line)
     file.writelines('!\n')
@@ -309,11 +309,14 @@ def main():
     #### INPUT ####
 
     # output file location
-    outfile_location = 'Output/F_linear.dat'
+    outfile_location = 'out_test.dat'
 
     # fourier calculation?
     fourier = False
     fourier_2d = False
+
+    # calculate the precession for every spin, and not just the muon?
+    do_all_spins_precession = True
 
 
     # if fourier calculation:
@@ -339,7 +342,7 @@ def main():
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
-    nnnness = 3  # 2 = nn, 3 = nnn etc
+    nnnness = 2  # 2 = nn, 3 = nnn etc
 
     ## IF NOT PW NOR XTL:
     # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
@@ -355,7 +358,8 @@ def main():
     input_coord_units = position_units.ALAT
 
     # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-    atomic_basis = [atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=251.713, II=1, name='F')]
+    atomic_basis = [atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([251.713,215.6]), II=np.array((1,2)), name='F',
+                         abundance=np.array((0.5, 0.5)))]
     # register the perturbed distances
     perturbed_distances = []
     # define muon position
@@ -522,7 +526,7 @@ def main():
         print("Found eigenvalues:")
         print(this_E)
 
-        # Calculate constant (lab book page 105)
+        # Calculate constant (lab book 1 page 105)
         thisconst = 0
         for i in range(0, len(R)):
             thisconst = thisconst + pow(abs(Rinv[i]*muon_spin_x*R[:, i]), 2) \
@@ -559,7 +563,7 @@ def main():
     # open file
     outfile = open(outfile_location, "w")
     # do preamble
-    file_preamble(outfile, muon_position, nnn_atoms, fourier, starttime, endtime, timestep, fourier_2d, tol,
+    file_preamble(outfile, muon_position, All_Spins, fourier, starttime, endtime, timestep, fourier_2d, tol,
                   use_xtl_input, xtl_input_location, use_pw_output, perturbed_distances, squish_radius, nnnness,
                   lattice_type, lattice_parameter)
 
