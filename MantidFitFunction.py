@@ -17,10 +17,10 @@ class DecoherenceFunction(IFunction1D): # or IPeakFunction
         self.declareParameter("A", 1.0)
 
         # open the file, and load the data into numpy arrays
-        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/Decoherence_calculator/CaF2data.dat")
+        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/Decoherence_calculator/Output/CaF2_nnnn_realsquish_noCa.dat")
 
         # normalise by making amplitude 1 (for now - multiply by A in the actual function)
-        normalise_factor = 1/self.amplitude_data[0]
+        self.amplitude_data = self.amplitude_data/self.amplitude_data[0]
 
 
     def function1D(self, xvals):
@@ -47,6 +47,9 @@ class DecoherenceFunction(IFunction1D): # or IPeakFunction
                 except ValueError:
                     pass
 
+        # close the input file
+        GLE_data_file.close()
+        
         # convert into numpy arrays
         time_data = np.array(time_data)
         amplitude_data = np.array(amplitude_data)

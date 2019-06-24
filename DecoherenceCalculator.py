@@ -47,7 +47,7 @@ class position_units(Enum):
 
 
 # nnn finder
-def nnn_finder(basis, muon, lattice_translation, nn=2, perturbations=None, squish_radius=None):
+def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, perturbations=None, squish_radius=None):
     # function which returns an array of TCoord3D of the nn etc
     # nn parameter: =2 for nn, 3 for nnn, 4 for nnnn...
     # nn_pert_distance: distance of the nn bond, set to None if perturbing manually/not perturbing at all
@@ -142,10 +142,10 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, perturbations=None, squis
             # reset current radius
             current_radius = atom[0]
         # if we're at the right nn, add this to the list
-        if current_nn <= nn:
+        if (current_nn <= nn and not exclusive_nnnness) or (current_nn == nn and exclusive_nnnness):
             chopped_nn.append(atom)
 
-    # return the nn, and only the nn
+    # return the nn asked for
     return chopped_nn
 
 
@@ -309,7 +309,7 @@ def main():
     #### INPUT ####
 
     # output file location
-    outfile_location = 'out_test.dat'
+    outfile_location = 'Output/test.dat'
 
     # fourier calculation?
     fourier = False
@@ -324,7 +324,7 @@ def main():
     # elif time calculation:
     starttime = 0
     timestep = 0.01
-    endtime = 10
+    endtime = 25
     # fi
 
     use_pw_output = False
@@ -334,36 +334,41 @@ def main():
 
     use_xtl_input = False
     ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
-    xtl_input_location = 'SnF2_atomic_positions.xtl'
+    xtl_input_location = ''
     # (don't forget to define nnnness!)
 
-    squish_radius = None  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    squish_radius = 1.1693  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
-    nnnness = 2  # 2 = nn, 3 = nnn etc
+    nnnness = 4  # 2 = nn, 3 = nnn etc
+    # exclusive_nnnness - if TRUE, then only calculate nnnness's interactions (and ignore the 2<=i<nnnness interactions)
+    exclusive_nnnness = True
 
     ## IF NOT PW NOR XTL:
     # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
-    lattice_type = ibrav.OTHER  # # can only do fcc and monoclinic (unique axis b)
+    lattice_type = ibrav.CUBIC_FCC  # # can only do fcc and monoclinic (unique axis b)
     # lattice parameters and angles, in angstroms
-    lattice_parameter = [2.36, 0, 0]  # [a, b, c]
-    lattice_angles = [90, 90, 90]  # [alpha, beta, gamma] in **degrees**
-    a1 = coord.TCoord3D(2.36, 0, 0)
-    a2 = coord.TCoord3D(0, 99, 0)
-    a3 = coord.TCoord3D(0, 0, 99)
+    lattice_parameter = [5.451, 0, 0]  # [a, b, c]
+    lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
 
     # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
     input_coord_units = position_units.ALAT
 
     # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-    atomic_basis = [atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([251.713,215.6]), II=np.array((1,2)), name='F',
-                         abundance=np.array((0.5, 0.5)))]
+    atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
+                    #     abundance=np.array([0.00145, 0.99855])),
+                    atom(coord.TCoord3D(0,0,0), gyromag_ratio=0, II=0, name='Ca'),
+                    atom(coord.TCoord3D(.25, .25, .25), gyromag_ratio=251.713, II=1, name='F'),
+                    atom(coord.TCoord3D(.75, .75, .75), gyromag_ratio=251.713, II=1, name='F'),
+                    ]
+
     # register the perturbed distances
     perturbed_distances = []
+
     # define muon position
-    muon_position = coord.TCoord3D(.5, 0, 0)
+    muon_position = coord.TCoord3D(0.25, 0.5, 0.25)
 
 
     ### END OF INPUT ###
@@ -468,7 +473,8 @@ def main():
             muon_position = muon.position
 
         # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
-        nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, perturbed_distances, squish_radius)
+        nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
+                               perturbed_distances, squish_radius)
 
         # as before, make a list of spins to calculate (including that of the muon)
         All_Spins = [muon]
@@ -630,7 +636,7 @@ def main():
             i = 0
             # now remove any amplitudes which are less than 1e-15
             while i < len(fourier)-1:
-                if abs(fourier[i][0]) < 1e-15:
+                if abs(fourier[i][0]) < 1e-7:
                     # remove the entry
                     del fourier[i]
                 else:
