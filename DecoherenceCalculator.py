@@ -235,7 +235,7 @@ def calc_p_average_t(t, const, amplitude, E):
 # do file preamble
 def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None, fourier_2d=None,
                   tol=None, use_xtl_input=None, xtl_input_location=None, use_pw_output=None, perturbed_distances=None,
-                  squish_radius=None,  nnnness=None, lattice_type=None, lattice_parameter=None):
+                  squish_radius=None,  nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
 
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
@@ -291,6 +291,12 @@ def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtim
 
     file.writelines(' interactions \n! \n')
 
+    if exclusive_nnnness == True and not use_pw_output:
+        file.writelines('! Effects of interactions of atoms spatially closer than ')
+        for i in range(0, nnnness):
+            file.writelines('n')
+        file.writelines(' have been ignored. \n! \n')
+
     # lattice type and parameter
     if not use_xtl_input:
         file.writelines('! lattice type: ' + str(lattice_type) + ' (based on QE convention) \n')
@@ -309,7 +315,7 @@ def main():
     #### INPUT ####
 
     # output file location
-    outfile_location = 'Output/test.dat'
+    outfile_location = 'Output/CaF2/exclusive_nnnn.dat'
 
     # fourier calculation?
     fourier = False
@@ -571,7 +577,7 @@ def main():
     # do preamble
     file_preamble(outfile, muon_position, All_Spins, fourier, starttime, endtime, timestep, fourier_2d, tol,
                   use_xtl_input, xtl_input_location, use_pw_output, perturbed_distances, squish_radius, nnnness,
-                  lattice_type, lattice_parameter)
+                  exclusive_nnnness, lattice_type, lattice_parameter)
 
     if fourier:
         if fourier_2d:
