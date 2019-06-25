@@ -315,7 +315,7 @@ def main():
     #### INPUT ####
 
     # output file location
-    outfile_location = 'Output/CaF2/exclusive_nnnn.dat'
+    outfile_location = 'Output/CaF2/DFT_10.dat'
 
     # fourier calculation?
     fourier = False
@@ -333,10 +333,10 @@ def main():
     endtime = 25
     # fi
 
-    use_pw_output = False
+    use_pw_output = True
     # ## IF WE'RE USING PW_OUTPUT
-    pw_output_file_location = ''
-    no_atoms = 8
+    pw_output_file_location = 'CaF2.relax.mu.pwo'
+    no_atoms = 11  # includes muon
 
     use_xtl_input = False
     ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
@@ -350,7 +350,7 @@ def main():
     # nn, nnn, nnnn?
     nnnness = 4  # 2 = nn, 3 = nnn etc
     # exclusive_nnnness - if TRUE, then only calculate nnnness's interactions (and ignore the 2<=i<nnnness interactions)
-    exclusive_nnnness = True
+    exclusive_nnnness = False
 
     ## IF NOT PW NOR XTL:
     # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048

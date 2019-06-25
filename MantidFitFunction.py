@@ -13,11 +13,12 @@ class DecoherenceFunction(IFunction1D): # or IPeakFunction
         return 'Muon'
 
     def init(self):
-        # register initial amplitude A
+        # register initial amplitude A, and a stretching factor for the time
         self.declareParameter("A", 1.0)
+        self.declareParameter("t_stretch", 1.0)
 
         # open the file, and load the data into numpy arrays
-        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/Decoherence_calculator/Output/CaF2_nnnn_realsquish_noCa.dat")
+        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/CaF2/CaF2_simulated_DFT.dat")
 
         # normalise by making amplitude 1 (for now - multiply by A in the actual function)
         self.amplitude_data = self.amplitude_data/self.amplitude_data[0]
@@ -26,7 +27,8 @@ class DecoherenceFunction(IFunction1D): # or IPeakFunction
     def function1D(self, xvals):
         # linearly interpolate between points to get the function value
         A = self.getParameterValue("A")
-        return A*np.interp(xvals, self.time_data, self.amplitude_data, 0, 0)
+        t_stretch = self.getParameterValue("t_stretch")
+        return A*np.interp(xvals, self.time_data*t_stretch, self.amplitude_data, 0, 0)
 
     def importGLEdata(self, file_location):
         # open the file

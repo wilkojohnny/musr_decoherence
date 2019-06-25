@@ -53,8 +53,8 @@ def get_atoms_from_pw_output(pw_file_location: str, num_atoms=2):
         # split the line up
         atom_raw_data = current_line.split()
         atom_name = atom_raw_data[0]
-        atom_position = coord.TCoord3D(float(atom_raw_data[1]), float(atom_raw_data[2]), float(atom_raw_data[3])
-                                       , prim_vectors)
+        atom_position = coord.TCoord3D(float(atom_raw_data[1]), float(atom_raw_data[2]), float(atom_raw_data[3]))
+                                       # , prim_vectors) removed - coordinates are in angstroms not primitive vectors.
         # have we seen this atom before?
         found_template_atom = False
         for template_atom in template_atoms:
