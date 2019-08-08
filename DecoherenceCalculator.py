@@ -283,7 +283,6 @@ def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtim
     elif isinstance(squish_radius, float) and not use_pw_output:
         file.writelines('! nearest neighbour F-mu radius adjusted to be ' + str(squish_radius) + ' angstroms. \n!\n')
 
-
     # nnn ness
     file.writelines('! Calculated by looking at ')
     for i in range(0, nnnness):
@@ -314,49 +313,28 @@ def write_to_file(file, t, P):
 def main():
     #### INPUT ####
 
-    # output file location
-    outfile_location = 'Output/CaF2/DFT_10.dat'
-
-    # fourier calculation?
-    fourier = False
-    fourier_2d = False
-
-    # calculate the precession for every spin, and not just the muon?
-    do_all_spins_precession = True
-
-
-    # if fourier calculation:
-    tol = 1e-10  # maximum difference between energies for them to be considered the same
-    # elif time calculation:
-    starttime = 0
-    timestep = 0.01
-    endtime = 25
-    # fi
-
-    use_pw_output = True
     # ## IF WE'RE USING PW_OUTPUT
-    pw_output_file_location = 'CaF2.relax.mu.pwo'
-    no_atoms = 11  # includes muon
+    # pw_output_file_location = 'CaF2.relax.mu.pwo'
+    # no_atoms = 11  # includes muon
 
-    use_xtl_input = False
     ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
-    xtl_input_location = ''
+    # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
     # (don't forget to define nnnness!)
 
-    squish_radius = 1.1693  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    squish_radius = None  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
-    nnnness = 4  # 2 = nn, 3 = nnn etc
+    # nnnness = 2  # 2 = nn, 3 = nnn etc
     # exclusive_nnnness - if TRUE, then only calculate nnnness's interactions (and ignore the 2<=i<nnnness interactions)
-    exclusive_nnnness = False
+    #   exclusive_nnnness = False
 
     ## IF NOT PW NOR XTL:
     # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
     lattice_type = ibrav.CUBIC_FCC  # # can only do fcc and monoclinic (unique axis b)
     # lattice parameters and angles, in angstroms
-    lattice_parameter = [5.451, 0, 0]  # [a, b, c]
+    lattice_parameter = [4.72, 0, 0]  # [a, b, c]
     lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
 
     # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
@@ -365,24 +343,55 @@ def main():
     # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
     atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
                     #     abundance=np.array([0.00145, 0.99855])),
-                    atom(coord.TCoord3D(0,0,0), gyromag_ratio=0, II=0, name='Ca'),
-                    atom(coord.TCoord3D(.25, .25, .25), gyromag_ratio=251.713, II=1, name='F'),
-                    atom(coord.TCoord3D(.75, .75, .75), gyromag_ratio=251.713, II=1, name='F'),
+                    atom(coord.TCoord3D(0, 0, 0.25), gyromag_ratio=251.713, II=1, name='F'),
                     ]
 
     # register the perturbed distances
     perturbed_distances = []
 
     # define muon position
-    muon_position = coord.TCoord3D(0.25, 0.5, 0.25)
+    muon_position = coord.TCoord3D(0, 0, 0)
+
+    calc_decoherence(muon_position=muon_position, squish_radius=None, lattice_type=lattice_type,
+                     lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
+                     input_coord_units=input_coord_units, atomic_basis=atomic_basis,
+                     perturbed_distances=perturbed_distances, plot=True, fourier=True, fourier_2d=True, nnnness=3)
 
 
-    ### END OF INPUT ###
+def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0.1),
+                     # arguments for manual input of lattice
+                     lattice_type=None, lattice_parameter=None, lattice_angles=None,
+                     input_coord_units=position_units.ALAT, atomic_basis=None, perturbed_distances=None,
+                     # arguments for XTL
+                     use_xtl_input=False, xtl_input_location=None,
+                     # arguments for XTL or manual input
+                     nnnness=2, exclusive_nnnness=False,
+                     # arguments for pw.x output
+                     use_pw_output=False, pw_output_file_location=None, no_atoms=0,
+                     # other arguments
+                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False):
 
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
         print('Cannot use pw and xtl inputs simultaneously. Aborting...')
-        exit()
+        return times * 0
+
+    # check that everything is in order: if not, then leave
+    if not use_pw_output and not use_xtl_input:
+        # should have manually entered all the details in
+        if lattice_type is None or lattice_parameter is None or lattice_angles is None or atomic_basis is None or \
+                perturbed_distances is None:
+            print('Not enough information given. Aborting...')
+            return times * 0
+    elif use_pw_output:
+        if pw_output_file_location is None or no_atoms<=0:
+            print('Not enough information given. Aborting...')
+            return times * 0
+    else:
+        if xtl_input_location is None:
+            print('Not enough information given. Aborting...')
+            return times * 0
+
 
     if use_pw_output:
         # get the atoms from the Quantum Espresso pw.x output, and put into an array
@@ -571,22 +580,10 @@ def main():
 
     ## OUTPUT ##
 
-
-    # open file
-    outfile = open(outfile_location, "w")
-    # do preamble
-    file_preamble(outfile, muon_position, All_Spins, fourier, starttime, endtime, timestep, fourier_2d, tol,
-                  use_xtl_input, xtl_input_location, use_pw_output, perturbed_distances, squish_radius, nnnness,
-                  exclusive_nnnness, lattice_type, lattice_parameter)
-
     if fourier:
-        if fourier_2d:
-            outfile.writelines('! frequency1 frequency2 amplitude \n')
-        else:
-            outfile.writelines('! frequency amplitude \n')
 
         # dump all into an array
-        fourier = []
+        fourier_result = []
 
         # for each isotope
         for isotope_combination in range(0, len(amplitude)):
@@ -595,88 +592,122 @@ def main():
                 if fourier_2d:
                     # noinspection PyTypeChecker
                     for j in range(0, len(E[isotope_combination])):
-                        fourier.append((amplitude[isotope_combination][i][j], E[isotope_combination][i], E[isotope_combination][j]))
+                        fourier_result.append((amplitude[isotope_combination][i][j], E[isotope_combination][i],
+                                               E[isotope_combination][j]))
                 else:
                     # noinspection PyTypeChecker
                     for j in range(i + 1, len(E[isotope_combination])):
-                        fourier.append((amplitude[isotope_combination][i][j], abs(E[isotope_combination][i] - E[isotope_combination][j])))
+                        fourier_result.append((amplitude[isotope_combination][i][j],
+                                               abs(E[isotope_combination][i] - E[isotope_combination][j])))
 
         # go through the frequencies, if there's degenerate eigenvalues then add together the amplitudes
         if fourier_2d:
-            fourier = sorted(fourier, key=lambda frequency: (frequency[1], frequency[2]))
+            fourier_result = sorted(fourier_result, key=lambda frequency: (frequency[1], frequency[2]))
             i = 0
-            while i < len(fourier)-1:
+            while i < len(fourier_result)-1:
                 # test for degeneracy (up to a tolerance for machine precision)
-                if (abs((fourier[i][1]) - (fourier[i+1][1])) < tol) and (abs(fourier[i][2] - fourier[i+1][2]) < tol):
+                if (abs((fourier_result[i][1]) - (fourier_result[i+1][1])) < tol) \
+                        and (abs(fourier_result[i][2] - fourier_result[i+1][2]) < tol):
                     # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                        fourier[i] = (fourier[i][0] + fourier[i + 1][0], fourier[i][1], fourier[i][2])
+                        fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0],
+                                             fourier_result[i][1], fourier_result[i][2])
                         # remove the i+1th (degenerate) eigenvalue
-                        del fourier[i + 1]
+                        del fourier_result[i + 1]
                 else:
                     i = i + 1
             # and sort and dedegenerate again...
-            fourier = sorted(fourier, key=lambda frequency: (frequency[2], frequency[1]))
+            fourier_result = sorted(fourier_result, key=lambda frequency: (frequency[2], frequency[1]))
             i = 0
-            while i < len(fourier)-1:
+            while i < len(fourier_result)-1:
                 # test for degeneracy (up to a tolerance for machine precision)
-                if (abs(fourier[i][1] - fourier[i+1][1]) < tol) and (abs(fourier[i][2] - fourier[i+1][2]) < tol):
+                if (abs(fourier_result[i][1] - fourier_result[i+1][1]) < tol)\
+                        and (abs(fourier_result[i][2] - fourier_result[i+1][2]) < tol):
                     # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                        fourier[i] = (fourier[i][0] + fourier[i + 1][0], fourier[i][1], fourier[i][2])
+                        fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0],
+                                             fourier_result[i][1], fourier_result[i][2])
                         # remove the i+1th (degenerate) eigenvalue
-                        del fourier[i + 1]
+                        del fourier_result[i + 1]
                 else:
                     i = i + 1
         else:
-            fourier = sorted(fourier, key=lambda frequency: frequency[1])
+            fourier_result = sorted(fourier_result, key=lambda frequency: frequency[1])
             i = 0
-            while i < len(fourier)-1:
+            while i < len(fourier_result)-1:
                 # test for degeneracy (up to a tolerance for machine precision)
-                if abs((fourier[i][1]) - (fourier[i+1][1])) < tol:
+                if abs((fourier_result[i][1]) - (fourier_result[i+1][1])) < tol:
                     # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                    fourier[i] = (fourier[i][0] + fourier[i+1][0], fourier[i][1])
+                    fourier_result[i] = (fourier_result[i][0] + fourier_result[i+1][0], fourier_result[i][1])
                     # remove the i+1th (degenerate) eigenvalue
-                    del fourier[i+1]
+                    del fourier_result[i+1]
                 else:
                     i = i + 1
 
             i = 0
             # now remove any amplitudes which are less than 1e-15
-            while i < len(fourier)-1:
-                if abs(fourier[i][0]) < 1e-7:
+            while i < len(fourier_result)-1:
+                if abs(fourier_result[i][0]) < 1e-7:
                     # remove the entry
-                    del fourier[i]
+                    del fourier_result[i]
                 else:
                     i = i + 1
 
-        # dump into file
-        if fourier_2d:
-            outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0]) + '\n'
-                                for fourier_entry in fourier])
-        else:
-            outfile.writelines('0 ' + str(const[0, 0]) + '\n')
-            outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[0]) + '\n' for fourier_entry in fourier])
-        outfile.close()
+        # dump into file if requested
+        if outfile_location is not None:
+            outfile = open(outfile_location, "w")
+            # do preamble
+            file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
+                          fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
+                          xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
+                          perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
+                          exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
+                          lattice_parameter=lattice_parameter)
+
+            if fourier_2d:
+                outfile.writelines('! frequency1 frequency2 amplitude \n')
+                outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0])
+                                    + '\n' for fourier_entry in fourier_result])
+            else:
+                outfile.writelines('! frequency amplitude \n')
+                outfile.writelines('0 ' + str(const[0, 0]) + '\n')
+                outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[0]) + '\n' for fourier_entry
+                                    in fourier_result])
+            outfile.close()
+
+        return np.array(fourier_result)
     else:
-        outfile.writelines('! t P_average \n')
+
         P_average = []
-        t = np.arange(starttime, endtime, timestep)
 
         # calculate each time separately
-        for time in np.nditer(t):
+        for time in np.nditer(times):
             print("t=" + str(time))
             P_average.append(calc_p_average_t(time, const, amplitude, E).max())
             # print(P_average[-1])
 
-        # dump results in a file
-        write_to_file(outfile, t, P_average)
-        outfile.close()
+        if outfile_location is not None:
+            # dump results in a file if requested
+            outfile = open(outfile_location, "w")
+            # do preamble
+            file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
+                          fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
+                          xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
+                          perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
+                          exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
+                          lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
+                          timestep=times[1]-times[0])
+            outfile.writelines('! t P_average \n')
+            write_to_file(outfile, times, P_average)
+            outfile.close()
 
         # plot the angular averaged muon polarisation
-        pyplot.plot(t, P_average)
-        pyplot.title('Muon Polarisation')
-        pyplot.xlabel('time (microseconds)')
-        pyplot.ylabel('Muon Polarisation')
-        pyplot.show()
+        if plot:
+            pyplot.plot(times, P_average)
+            pyplot.title('Muon Polarisation')
+            pyplot.xlabel('time (microseconds)')
+            pyplot.ylabel('Muon Polarisation')
+            pyplot.show()
+
+        return np.array(P_average)
 
 
 if __name__ == '__main__':

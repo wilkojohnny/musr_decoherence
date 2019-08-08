@@ -18,7 +18,7 @@ class DecoherenceFunction(IFunction1D): # or IPeakFunction
         self.declareParameter("t_stretch", 1.0)
 
         # open the file, and load the data into numpy arrays
-        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/CaF2/CaF2_simulated_DFT.dat")
+        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/CaF2/CaF2_simulated_data.dat")
 
         # normalise by making amplitude 1 (for now - multiply by A in the actual function)
         self.amplitude_data = self.amplitude_data/self.amplitude_data[0]
