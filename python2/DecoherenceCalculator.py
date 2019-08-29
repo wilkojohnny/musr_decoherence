@@ -1,6 +1,8 @@
 # DecoherenceCalculator.py - Calculate decoherence of muon state in any lattice with any structure
 
-from MDecoherenceAtom import TDecoherenceAtom as atom  # import class for decoherence atom
+from __future__ import division
+from __future__ import absolute_import
+from MDecoherenceAtom import TDecoherenceAtom as Tatom  # import class for decoherence atom
 import TCoord3D as coord  # 3D coordinates class
 import AtomObtainer  # to obtain atoms from pw output file
 import numpy as np  # for matrices
@@ -10,6 +12,7 @@ import matplotlib.pyplot as pyplot      # for plotting
 from datetime import datetime  # for date and time printing in the output file
 from enum import Enum  # for enumerations for the inputs - makes everything a lot easier to read!
 import subprocess  # to get the current git version
+from io import open
 
 
 # class to define the enumerations for the different types of lattices available - same as pw.x
@@ -78,9 +81,9 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
         exact_nml = np.linalg.solve(lattice_vector_matrix, muatpos)
 
         # for each term in exact_nml, look +-1 in each direction (floor+-(nn-1) will do for now)
-        for i in range(0, len(exact_nml)):
+        for i in xrange(0, len(exact_nml)):
             flr_nml = np.floor(exact_nml[i])
-            for nm_or_l in range(int(flr_nml) - (nn - 1), int(flr_nml) + (nn + 1)):
+            for nm_or_l in xrange(int(flr_nml) - (nn - 1), int(flr_nml) + (nn + 1)):
                 # is this in the list?
                 if nm_or_l not in nml_list[i]:
                     nml_list[i].append(nm_or_l)
@@ -110,7 +113,7 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
     # find the closest two F atoms, and perturb by means of squisification
     closest_F_radius = 0
     for atom in nearestneighbours:
-        if atom[2].name == 'F':
+        if atom[2].name == u'F':
             if closest_F_radius == 0:
                 closest_F_radius = atom[0]  # if no Fs have been registered yet, use this radius as the reference
             elif (atom[0] - closest_F_radius) < 1e-3:
@@ -156,7 +159,7 @@ def inc_isotope_id(basis, oldids=None):
         return [0 for xx in basis]
     else:
         # try to increase the first isotopeid by 1, if greater, then increment the next, etc
-        for i in range(0, len(basis)):
+        for i in xrange(0, len(basis)):
             oldids[i] = oldids[i] + 1
             if oldids[i] < basis[i]:
                 break
@@ -173,12 +176,12 @@ def measure_ith_spin(Spins, i, pauli_matrix):
 
     # calculate the dimension of the identity matrix on the LHS ...
     lhs_dim = 1
-    for i_spin in range(0, i):
+    for i_spin in xrange(0, i):
         lhs_dim = lhs_dim * Spins[i_spin].pauli_dimension
 
     # ... and the RHS
     rhs_dim = 1
-    for i_spin in range(i + 1, len(Spins)):
+    for i_spin in xrange(i + 1, len(Spins)):
         rhs_dim = rhs_dim * Spins[i_spin].pauli_dimension
 
     return sparse.kron(sparse.kron(sparse.identity(lhs_dim), pauli_matrix), sparse.identity(rhs_dim))
@@ -212,8 +215,8 @@ def calc_total_hamiltonian(spins):
     current_hamiltonian = 0
 
     # calculate hamiltonian for each pair and add onto sum
-    for i in range(0, len(spins)):
-        for j in range(i+1, len(spins)):
+    for i in xrange(0, len(spins)):
+        for j in xrange(i+1, len(spins)):
             current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
     return current_hamiltonian
 
@@ -222,9 +225,9 @@ def calc_total_hamiltonian(spins):
 def calc_p_average_t(t, const, amplitude, E):
     # calculate the oscillating term
     osc_term = 0
-    for isotope_combination in range(0, len(amplitude)):
-        for i in range(0, len(E[isotope_combination])):
-            for j in range(i+1, len(E[isotope_combination])):
+    for isotope_combination in xrange(0, len(amplitude)):
+        for i in xrange(0, len(E[isotope_combination])):
+            for j in xrange(i+1, len(E[isotope_combination])):
                 osc_term = osc_term + amplitude[isotope_combination][i][j]*np.cos((E[isotope_combination][i]
                                                                                    - E[isotope_combination][j])*t)
 
@@ -238,125 +241,76 @@ def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtim
                   squish_radius=None,  nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
 
     # program name, date and time completed
-    file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
+    file.writelines(u'! Decoherence Calculator Output - ' + datetime.now().strftime(u"%d/%m/%Y, %H:%M:%S") + u'\n!\n')
 
     # get the git version
-    version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
-    file.writelines('! Using version ' + str(version_label) + '\n!\n')
+    version_label = subprocess.check_output([u"git", u"describe", u"--always"]).strip()
+    file.writelines(u'! Using version ' + unicode(version_label) + u'\n!\n')
 
     # type of calculation
     if not fourier:
-        file.writelines('! time calculation completed between t=' + str(starttime) + ' and ' + str(endtime) +
-                        ' with a timestep of ' + str(timestep) + ' microseconds' + '\n!\n')
+        file.writelines(u'! time calculation completed between t=' + unicode(starttime) + u' and ' + unicode(endtime) +
+                        u' with a timestep of ' + unicode(timestep) + u' microseconds' + u'\n!\n')
     else:
         if fourier_2d:
-            file.writelines('! 2D fourier calculation, showing the amplitude between each transition pair. \n')
+            file.writelines(u'! 2D fourier calculation, showing the amplitude between each transition pair. \n')
         else:
-            file.writelines('! 1D fourier calculation, showing the amplitude of each E_i-E_j combination \n')
-        file.writelines('! absolute tolerance between eigenvalues to treat them as equivalent was ' + str(tol)
-                        + '\n!\n')
+            file.writelines(u'! 1D fourier calculation, showing the amplitude of each E_i-E_j combination \n')
+        file.writelines(u'! absolute tolerance between eigenvalues to treat them as equivalent was ' + unicode(tol)
+                        + u'\n!\n')
 
     # data source, if used
     if use_xtl_input:
-        file.writelines('! Atom positional data was obtained from XTL (fractional crystal coordinate) file: ' +
-                        xtl_input_location + '\n')
+        file.writelines(u'! Atom positional data was obtained from XTL (fractional crystal coordinate) file: ' +
+                        xtl_input_location + u'\n')
     if use_pw_output:
-        file.writelines('! Atom positional data was obtained from QE PWSCF file: ' + xtl_input_location + '\n')
+        file.writelines(u'! Atom positional data was obtained from QE PWSCF file: ' + xtl_input_location + u'\n')
 
     # Basis atoms, with gyromag ratios and I values
     for atom in nn_atoms:
         lines_to_write = atom.verbose_description(gle_friendly=True)
         for line in lines_to_write:
             file.writelines(line)
-    file.writelines('!\n')
+    file.writelines(u'!\n')
 
     # muon position
-    file.writelines('! muon position: ' + str(muon_position) + ' \n! \n')
+    file.writelines(u'! muon position: ' + unicode(muon_position) + u' \n! \n')
 
     # atom perturbations
     if len(perturbed_distances) > 0:
-        file.writelines('! atom position perturbations: \n')
-        for iperturbpair in range(0, len(perturbed_distances)):
-            file.writelines('!\t ' + str(perturbed_distances[iperturbpair][0]) + ' to '
-                            + str(perturbed_distances[iperturbpair][1]) + '\n')
-        file.writelines('! \n')
+        file.writelines(u'! atom position perturbations: \n')
+        for iperturbpair in xrange(0, len(perturbed_distances)):
+            file.writelines(u'!\t ' + unicode(perturbed_distances[iperturbpair][0]) + u' to '
+                            + unicode(perturbed_distances[iperturbpair][1]) + u'\n')
+        file.writelines(u'! \n')
     elif isinstance(squish_radius, float) and not use_pw_output:
-        file.writelines('! nearest neighbour F-mu radius adjusted to be ' + str(squish_radius) + ' angstroms. \n!\n')
+        file.writelines(u'! nearest neighbour F-mu radius adjusted to be ' + unicode(squish_radius) + u' angstroms. \n!\n')
 
     # nnn ness
-    file.writelines('! Calculated by looking at ')
-    for i in range(0, nnnness):
-        file.writelines('n')
+    file.writelines(u'! Calculated by looking at ')
+    for i in xrange(0, nnnness):
+        file.writelines(u'n')
 
-    file.writelines(' interactions \n! \n')
+    file.writelines(u' interactions \n! \n')
 
     if exclusive_nnnness == True and not use_pw_output:
-        file.writelines('! Effects of interactions of atoms spatially closer than ')
-        for i in range(0, nnnness):
-            file.writelines('n')
-        file.writelines(' have been ignored. \n! \n')
+        file.writelines(u'! Effects of interactions of atoms spatially closer than ')
+        for i in xrange(0, nnnness):
+            file.writelines(u'n')
+        file.writelines(u' have been ignored. \n! \n')
 
     # lattice type and parameter
     if not use_xtl_input:
-        file.writelines('! lattice type: ' + str(lattice_type) + ' (based on QE convention) \n')
-        file.writelines('! lattice parameter: ' + str(lattice_parameter) + ' Angstroms \n! \n')
+        file.writelines(u'! lattice type: ' + unicode(lattice_type) + u' (based on QE convention) \n')
+        file.writelines(u'! lattice parameter: ' + unicode(lattice_parameter) + u' Angstroms \n! \n')
 
-    file.writelines('! start of data: \n')
+    file.writelines(u'! start of data: \n')
 
 
 # batch write data to file
 def write_to_file(file, t, P):
-    for i in range(0, len(t)-1):
-        file.writelines(str(t[i]) + ' ' + str(P[i]) + '\n')
-
-
-def main():
-    #### INPUT ####
-
-    # ## IF WE'RE USING PW_OUTPUT
-    # pw_output_file_location = 'CaF2.relax.mu.pwo'
-    # no_atoms = 11  # includes muon
-
-    ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
-    # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
-    # (don't forget to define nnnness!)
-
-    squish_radius = None  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
-
-
-    ## IF WE'RE NOT USING pw output:
-    # nn, nnn, nnnn?
-    # nnnness = 2  # 2 = nn, 3 = nnn etc
-    # exclusive_nnnness - if TRUE, then only calculate nnnness's interactions (and ignore the 2<=i<nnnness interactions)
-    #   exclusive_nnnness = False
-
-    ## IF NOT PW NOR XTL:
-    # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
-    lattice_type = ibrav.CUBIC_FCC  # # can only do fcc and monoclinic (unique axis b)
-    # lattice parameters and angles, in angstroms
-    lattice_parameter = [5.44542, 0, 0]  # [a, b, c]
-    lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
-
-    # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
-    input_coord_units = position_units.ALAT
-
-    # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-    atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
-                    #     abundance=np.array([0.00145, 0.99855])),
-                    atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name='F'),
-                    atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name='F')
-                    ]
-
-    # register the perturbed distances
-    perturbed_distances = []
-
-    # define muon position
-    muon_position = coord.TCoord3D(.25, 0.25, 0.5)
-
-    calc_decoherence(muon_position=muon_position, squish_radius=None, lattice_type=lattice_type,
-                     lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
-                     input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                     perturbed_distances=perturbed_distances, plot=True, nnnness=2)
+    for i in xrange(0, len(t)-1):
+        file.writelines(unicode(t[i]) + u' ' + unicode(P[i]) + u'\n')
 
 
 def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0.1),
@@ -370,11 +324,11 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                      # arguments for pw.x output
                      use_pw_output=False, pw_output_file_location=None, no_atoms=0,
                      # other arguments
-                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False):
+                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False):
 
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
-        print('Cannot use pw and xtl inputs simultaneously. Aborting...')
+        print u'Cannot use pw and xtl inputs simultaneously. Aborting...'
         return times * 0
 
     # check that everything is in order: if not, then leave
@@ -382,15 +336,15 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         # should have manually entered all the details in
         if lattice_type is None or lattice_parameter is None or lattice_angles is None or atomic_basis is None or \
                 perturbed_distances is None:
-            print('Not enough information given. Aborting...')
+            print u'Not enough information given. Aborting...'
             return times * 0
     elif use_pw_output:
         if pw_output_file_location is None or no_atoms<=0:
-            print('Not enough information given. Aborting...')
+            print u'Not enough information given. Aborting...'
             return times * 0
     else:
         if xtl_input_location is None:
-            print('Not enough information given. Aborting...')
+            print u'Not enough information given. Aborting...'
             return times * 0
 
 
@@ -481,7 +435,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                 pass
 
             # create muon
-            muon = atom(muon_position, gyromag_ratio=851.372, II=1, name='mu')
+            muon = Tatom(muon_position, gyromag_ratio=851.372, II=1, name=u'mu')
         else:
             # import the fractional coordinates from the XTL
             muon, atomic_basis, [a1, a2, a3] = AtomObtainer.get_atoms_from_xtl(xtl_file_location=xtl_input_location)
@@ -492,18 +446,20 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
                                perturbed_distances, squish_radius)
 
+        print unicode(squish_radius)
+
         # as before, make a list of spins to calculate (including that of the muon)
         All_Spins = [muon]
         for i_atom in nnn_atoms:
-            All_Spins.append(atom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
+            All_Spins.append(Tatom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
 
     # print the atoms in the list
     for i_atom in All_Spins:
-        print(i_atom)
+        print i_atom
 
     # turn the spins into a muon-centred basis
     for spin in All_Spins:
-        for isotopeid in range(0, len(spin)):
+        for isotopeid in xrange(0, len(spin)):
             spin[isotopeid].position = spin[isotopeid].position - muon_position
 
     # count number of spins
@@ -513,8 +469,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
     isotope_combinations = 1
     for atoms in All_Spins:
         isotope_combinations = isotope_combinations*len(atoms)
-    if not shutup:
-        print(str(isotope_combinations) + ' isotope combination(s) found')
+    print unicode(isotope_combinations) + u' isotope combination(s) found'
 
     # put all these number of isotopes into an array
     number_isotopes = [len(atom) for atom in All_Spins]
@@ -529,7 +484,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         # put this combination of isotopes into an array (Spins), and calculate probability of this state
         probability = 1.
         Spins = []
-        for atomid in range(0, len(All_Spins)):
+        for atomid in xrange(0, len(All_Spins)):
             Spins.append(All_Spins[atomid][current_isotope_ids[atomid]])
             probability = probability * All_Spins[atomid][current_isotope_ids[atomid]].abundance
 
@@ -542,18 +497,16 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         hamiltonian = calc_total_hamiltonian(Spins)
 
         # find eigenvalues and eigenvectors of hamiltonian
-        if not shutup:
-            print("Finding eigenvalues...")
+        print u"Finding eigenvalues..."
         dense_hamiltonian = hamiltonian.todense()
         this_E, R = linalg.eigh(dense_hamiltonian)
         Rinv = R.H
-        if not shutup:
-            print("Found eigenvalues:")
-            print(this_E)
+        print u"Found eigenvalues:"
+        print this_E
 
         # Calculate constant (lab book 1 page 105)
         thisconst = 0
-        for i in range(0, len(R)):
+        for i in xrange(0, len(R)):
             thisconst = thisconst + pow(abs(Rinv[i]*muon_spin_x*R[:, i]), 2) \
                             + pow(abs(Rinv[i]*muon_spin_y*R[:, i]), 2) \
                             + pow(abs(Rinv[i]*muon_spin_z*R[:, i]), 2)
@@ -561,17 +514,16 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
 
         this_amplitude = np.zeros((len(R), len(R)))
         # now calculate oscillating term
-        for i in range(0, len(R)):
+        for i in xrange(0, len(R)):
             Rx = Rinv[i] * muon_spin_x
             Ry = Rinv[i] * muon_spin_y
             Rz = Rinv[i] * muon_spin_z
-            if not shutup:
-                print(str(100*i/len(R)) + '% complete...')
+            print unicode(100*i/len(R)) + u'% complete...'
             if fourier_2d:
                 jmin = 0
             else:
                 jmin = i+1
-            for j in range(jmin, len(R)):
+            for j in xrange(jmin, len(R)):
                 this_amplitude[i][j] = (pow(abs(Rx*R[:, j]), 2)
                                         + pow(abs(Ry*R[:, j]), 2)
                                         + pow(abs(Rz*R[:, j]), 2))*probability / (3*(muon_spin_x.shape[0]/2))
@@ -591,17 +543,17 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         fourier_result = []
 
         # for each isotope
-        for isotope_combination in range(0, len(amplitude)):
+        for isotope_combination in xrange(0, len(amplitude)):
             # noinspection PyTypeChecker
-            for i in range(0, len(E[isotope_combination])):
+            for i in xrange(0, len(E[isotope_combination])):
                 if fourier_2d:
                     # noinspection PyTypeChecker
-                    for j in range(0, len(E[isotope_combination])):
+                    for j in xrange(0, len(E[isotope_combination])):
                         fourier_result.append((amplitude[isotope_combination][i][j], E[isotope_combination][i],
                                                E[isotope_combination][j]))
                 else:
                     # noinspection PyTypeChecker
-                    for j in range(i + 1, len(E[isotope_combination])):
+                    for j in xrange(i + 1, len(E[isotope_combination])):
                         fourier_result.append((amplitude[isotope_combination][i][j],
                                                abs(E[isotope_combination][i] - E[isotope_combination][j])))
 
@@ -658,7 +610,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
 
         # dump into file if requested
         if outfile_location is not None:
-            outfile = open(outfile_location, "w")
+            outfile = open(outfile_location, u"w")
             # do preamble
             file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
                           fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
@@ -668,31 +620,31 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                           lattice_parameter=lattice_parameter)
 
             if fourier_2d:
-                outfile.writelines('! frequency1 frequency2 amplitude \n')
-                outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0])
-                                    + '\n' for fourier_entry in fourier_result])
+                outfile.writelines(u'! frequency1 frequency2 amplitude \n')
+                outfile.writelines([unicode(fourier_entry[1]) + u' ' + unicode(fourier_entry[2]) + u' ' + unicode(fourier_entry[0])
+                                    + u'\n' for fourier_entry in fourier_result])
             else:
-                outfile.writelines('! frequency amplitude \n')
-                outfile.writelines('0 ' + str(const[0, 0]) + '\n')
-                outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[0]) + '\n' for fourier_entry
+                outfile.writelines(u'! frequency amplitude \n')
+                outfile.writelines(u'0 ' + unicode(const[0, 0]) + u'\n')
+                outfile.writelines([unicode(fourier_entry[1]) + u' ' + unicode(fourier_entry[0]) + u'\n' for fourier_entry
                                     in fourier_result])
             outfile.close()
 
         return np.array(fourier_result)
-    else:
+
+    else: # if not fourier output:
 
         P_average = []
 
         # calculate each time separately
         for time in np.nditer(times):
-            if not shutup:
-                print("t=" + str(time))
+            print u"t=" + unicode(time)
             P_average.append(calc_p_average_t(time, const, amplitude, E).max())
             # print(P_average[-1])
 
         if outfile_location is not None:
             # dump results in a file if requested
-            outfile = open(outfile_location, "w")
+            outfile = open(outfile_location, u"w")
             # do preamble
             file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
                           fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
@@ -701,20 +653,16 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                           exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
                           lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
                           timestep=times[1]-times[0])
-            outfile.writelines('! t P_average \n')
+            outfile.writelines(u'! t P_average \n')
             write_to_file(outfile, times, P_average)
             outfile.close()
 
         # plot the angular averaged muon polarisation
         if plot:
             pyplot.plot(times, P_average)
-            pyplot.title('Muon Polarisation')
-            pyplot.xlabel('time (microseconds)')
-            pyplot.ylabel('Muon Polarisation')
+            pyplot.title(u'Muon Polarisation')
+            pyplot.xlabel(u'time (microseconds)')
+            pyplot.ylabel(u'Muon Polarisation')
             pyplot.show()
 
         return np.array(P_average)
-
-
-if __name__ == '__main__':
-    main()

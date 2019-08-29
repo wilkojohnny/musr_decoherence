@@ -4,7 +4,10 @@
 
 from mantid.api import *
 import numpy as np
-
+import sys
+import TCoord3D as coord
+import DecoherenceCalculator
+from MDecoherenceAtom import TDecoherenceAtom as atom
 
 # You choose which type you would like by picking the super class
 class DecoherenceFunction(IFunction1D): # or IPeakFunction
@@ -15,20 +18,35 @@ class DecoherenceFunction(IFunction1D): # or IPeakFunction
     def init(self):
         # register initial amplitude A, and a stretching factor for the time
         self.declareParameter("A", 1.0)
-        self.declareParameter("t_stretch", 1.0)
+        self.declareParameter("F_mu distance", 1.18)
 
-        # open the file, and load the data into numpy arrays
-        self.time_data, self.amplitude_data = self.importGLEdata("/Users/johnny/Documents/University/CaF2/CaF2_simulated_data.dat")
+        # lattice parameters and angles, in angstroms
+        self.lattice_parameter = [5.44542, 0, 0]  # [a, b, c]
+        self.lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
 
-        # normalise by making amplitude 1 (for now - multiply by A in the actual function)
-        self.amplitude_data = self.amplitude_data/self.amplitude_data[0]
+        # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
+        self.input_coord_units = DecoherenceCalculator.position_units.ALAT
 
+        # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
+        self.atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
+                        #     abundance=np.array([0.00145, 0.99855])),
+                        atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name=u'F'),
+                        atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name=u'F')
+                        ]
+                        
+        # define muon position
+        self.muon_position = coord.TCoord3D(.25, 0.25, 0.5)
+        
 
     def function1D(self, xvals):
         # linearly interpolate between points to get the function value
         A = self.getParameterValue("A")
-        t_stretch = self.getParameterValue("t_stretch")
-        return A*np.interp(xvals, self.time_data*t_stretch, self.amplitude_data, 0, 0)
+        squish_radius = self.getParameterValue("F_mu distance")
+        vals = calc_decoherence(muon_position=self.muon_position, squish_radius=squish_radius, lattice_type=lattice_type,
+                 lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
+                 input_coord_units=input_coord_units, atomic_basis=atomic_basis,
+                 perturbed_distances=perturbed_distances, plot=True, nnnness=2, times=xvals)
+        return A*vals
 
     def importGLEdata(self, file_location):
         # open the file

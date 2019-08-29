@@ -370,7 +370,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                      # arguments for pw.x output
                      use_pw_output=False, pw_output_file_location=None, no_atoms=0,
                      # other arguments
-                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False):
+                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False):
 
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
@@ -513,8 +513,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
     isotope_combinations = 1
     for atoms in All_Spins:
         isotope_combinations = isotope_combinations*len(atoms)
-    if not shutup:
-        print(str(isotope_combinations) + ' isotope combination(s) found')
+    print(str(isotope_combinations) + ' isotope combination(s) found')
 
     # put all these number of isotopes into an array
     number_isotopes = [len(atom) for atom in All_Spins]
@@ -542,14 +541,12 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         hamiltonian = calc_total_hamiltonian(Spins)
 
         # find eigenvalues and eigenvectors of hamiltonian
-        if not shutup:
-            print("Finding eigenvalues...")
+        print("Finding eigenvalues...")
         dense_hamiltonian = hamiltonian.todense()
         this_E, R = linalg.eigh(dense_hamiltonian)
         Rinv = R.H
-        if not shutup:
-            print("Found eigenvalues:")
-            print(this_E)
+        print("Found eigenvalues:")
+        print(this_E)
 
         # Calculate constant (lab book 1 page 105)
         thisconst = 0
@@ -565,8 +562,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             Rx = Rinv[i] * muon_spin_x
             Ry = Rinv[i] * muon_spin_y
             Rz = Rinv[i] * muon_spin_z
-            if not shutup:
-                print(str(100*i/len(R)) + '% complete...')
+            print(str(100*i/len(R)) + '% complete...')
             if fourier_2d:
                 jmin = 0
             else:
@@ -685,8 +681,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
 
         # calculate each time separately
         for time in np.nditer(times):
-            if not shutup:
-                print("t=" + str(time))
+            print("t=" + str(time))
             P_average.append(calc_p_average_t(time, const, amplitude, E).max())
             # print(P_average[-1])
 
