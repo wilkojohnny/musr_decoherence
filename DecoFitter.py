@@ -9,6 +9,7 @@ from MDecoherenceAtom import TDecoherenceAtom as atom  # import class for decohe
 import matplotlib.pyplot as pyplot  # for plotting
 import matplotlib.colors as color
 
+
 def main():
 
     # load in the data (expect it of the form x y yerr)
@@ -16,15 +17,25 @@ def main():
 
     # try to do a fit
     initial_guess = [31.97, 1.171909, 0]
-    params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_guess, sigma=y_error)
-    params_errors = np.sqrt(np.diag(covariances))
+    # params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_guess, sigma=y_error)
+    # params_errors = np.sqrt(np.diag(covariances))
+    #
+    # print(params)
+    # print(params_errors)
 
-    print(params)
-    print(params_errors)
+    params = initial_guess
+    # calculate the fit function one last time
+    fit_func = fit_function(x, params[0], params[1], params[2])
+    # find the chi squared
+    chi_squared = (((fit_func - y)/y_error)**2).sum()
+    chi_squared_dof = chi_squared/(len(y) - len(params))
+
+    # print out the chi squared
+    print('Chi-squared: ' + str(chi_squared) + ' (' + str(chi_squared_dof) + ' per dof)')
 
     # plot the data
     pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
-    pyplot.plot(x, fit_function(x, params[0], params[1], params[2]), color=color.cnames['black'])
+    pyplot.plot(x, fit_func, color=color.cnames['black'])
     pyplot.ylim([-10, 20])
     pyplot.xlim([0, 25])
     pyplot.show()
@@ -57,6 +68,7 @@ def fit_function(x, A, squish, A0):
                                                   plot=False, nnnness=3, shutup=True)
 
     return A*deco + A0*np.ones(len(x))
+
 
 def load_muon_data(filename: str, encoding='iso-8859-1'):
     # loads muon data, spits it out as three numpy arrays: x, y, yerr

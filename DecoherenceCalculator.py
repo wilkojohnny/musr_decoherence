@@ -6,7 +6,7 @@ import AtomObtainer  # to obtain atoms from pw output file
 import numpy as np  # for matrices
 import scipy.sparse as sparse  # for sparse matrices
 import numpy.linalg as linalg  # for linear algebra
-import matplotlib.pyplot as pyplot      # for plotting
+import matplotlib.pyplot as pyplot  # for plotting
 from datetime import datetime  # for date and time printing in the output file
 from enum import Enum  # for enumerations for the inputs - makes everything a lot easier to read!
 import subprocess  # to get the current git version
@@ -170,7 +170,6 @@ def inc_isotope_id(basis, oldids=None):
 
 # make measurement operator for this spin
 def measure_ith_spin(Spins, i, pauli_matrix):
-
     # calculate the dimension of the identity matrix on the LHS ...
     lhs_dim = 1
     for i_spin in range(0, i):
@@ -202,9 +201,9 @@ def calc_hamiltonian_term(spins, i, j):
     j_z = measure_ith_spin(spins, j, spins[j].pauli_z)
 
     # Calculate the hamiltonian!
-    return A/pow(abs(r.r()), 3)*(i_x*j_x + i_y*j_y + i_z*j_z
-                                 - 3*(i_x*r.xhat() + i_y*r.yhat() + i_z*r.zhat())
-                                 * (j_x*r.xhat() + j_y*r.yhat() + j_z*r.zhat()))
+    return A / pow(abs(r.r()), 3) * (i_x * j_x + i_y * j_y + i_z * j_z
+                                     - 3 * (i_x * r.xhat() + i_y * r.yhat() + i_z * r.zhat())
+                                     * (j_x * r.xhat() + j_y * r.yhat() + j_z * r.zhat()))
 
 
 # calculate entire hamiltonian
@@ -213,7 +212,7 @@ def calc_total_hamiltonian(spins):
 
     # calculate hamiltonian for each pair and add onto sum
     for i in range(0, len(spins)):
-        for j in range(i+1, len(spins)):
+        for j in range(i + 1, len(spins)):
             current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
     return current_hamiltonian
 
@@ -224,9 +223,9 @@ def calc_p_average_t(t, const, amplitude, E):
     osc_term = 0
     for isotope_combination in range(0, len(amplitude)):
         for i in range(0, len(E[isotope_combination])):
-            for j in range(i+1, len(E[isotope_combination])):
-                osc_term = osc_term + amplitude[isotope_combination][i][j]*np.cos((E[isotope_combination][i]
-                                                                                   - E[isotope_combination][j])*t)
+            for j in range(i + 1, len(E[isotope_combination])):
+                osc_term = osc_term + amplitude[isotope_combination][i][j] * np.cos((E[isotope_combination][i]
+                                                                                     - E[isotope_combination][j]) * t)
 
     # add on the constant, and return, and divide by the size of the space
     return const + osc_term
@@ -235,8 +234,7 @@ def calc_p_average_t(t, const, amplitude, E):
 # do file preamble
 def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None, fourier_2d=None,
                   tol=None, use_xtl_input=None, xtl_input_location=None, use_pw_output=None, perturbed_distances=None,
-                  squish_radius=None,  nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
-
+                  squish_radius=None, nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
@@ -306,7 +304,7 @@ def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtim
 
 # batch write data to file
 def write_to_file(file, t, P):
-    for i in range(0, len(t)-1):
+    for i in range(0, len(t) - 1):
         file.writelines(str(t[i]) + ' ' + str(P[i]) + '\n')
 
 
@@ -321,8 +319,7 @@ def main():
     # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
     # (don't forget to define nnnness!)
 
-    squish_radius = None  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
-
+    squish_radius = 1.172211  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
@@ -341,11 +338,12 @@ def main():
     input_coord_units = position_units.ALAT
 
     # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-    atomic_basis = [#atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
-                    #     abundance=np.array([0.00145, 0.99855])),
-                    atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name='F'),
-                    atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name='F')
-                    ]
+    atomic_basis = [
+        # atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
+        #     abundance=np.array([0.00145, 0.99855])),
+        atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name='F'),
+        atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name='F')
+    ]
 
     # register the perturbed distances
     perturbed_distances = []
@@ -353,10 +351,11 @@ def main():
     # define muon position
     muon_position = coord.TCoord3D(.25, 0.25, 0.5)
 
-    calc_decoherence(muon_position=muon_position, squish_radius=None, lattice_type=lattice_type,
+    calc_decoherence(muon_position=muon_position, squish_radius=squish_radius, lattice_type=lattice_type,
                      lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                      input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                     perturbed_distances=perturbed_distances, plot=True, nnnness=2)
+                     perturbed_distances=perturbed_distances, plot=True, nnnness=3,
+                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0,5,0.1))
 
 
 def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0.1),
@@ -370,8 +369,8 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                      # arguments for pw.x output
                      use_pw_output=False, pw_output_file_location=None, no_atoms=0,
                      # other arguments
-                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False):
-
+                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False,
+                     ask_each_atom=False):
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
         print('Cannot use pw and xtl inputs simultaneously. Aborting...')
@@ -385,14 +384,13 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             print('Not enough information given. Aborting...')
             return times * 0
     elif use_pw_output:
-        if pw_output_file_location is None or no_atoms<=0:
+        if pw_output_file_location is None or no_atoms <= 0:
             print('Not enough information given. Aborting...')
             return times * 0
     else:
         if xtl_input_location is None:
             print('Not enough information given. Aborting...')
             return times * 0
-
 
     if use_pw_output:
         # get the atoms from the Quantum Espresso pw.x output, and put into an array
@@ -407,9 +405,9 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             a = lattice_parameter[0]
             b = lattice_parameter[1]
             c = lattice_parameter[2]
-            alpha = lattice_angles[0]*np.pi/180.
-            beta = lattice_angles[1]*np.pi/180.
-            gamma = lattice_angles[2]*np.pi/180.
+            alpha = lattice_angles[0] * np.pi / 180.
+            beta = lattice_angles[1] * np.pi / 180.
+            gamma = lattice_angles[2] * np.pi / 180.
 
             # type of calculation - can't do fourier2d if not fourier
             fourier_2d = fourier_2d and fourier
@@ -422,22 +420,22 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                 a3 = coord.TCoord3D(0, 0, a)
             elif lattice_type == ibrav.CUBIC_FCC:
                 # fcc cubic
-                a1 = coord.TCoord3D(-a*.5, 0, a*.5)
-                a2 = coord.TCoord3D(0, a*.5, a*.5)
-                a3 = coord.TCoord3D(-a*.5, a*.5, 0)
+                a1 = coord.TCoord3D(-a * .5, 0, a * .5)
+                a2 = coord.TCoord3D(0, a * .5, a * .5)
+                a3 = coord.TCoord3D(-a * .5, a * .5, 0)
             elif lattice_type == ibrav.CUBIC_BCC:
-                a1 = coord.TCoord3D(.5*a, .5*a, .5*a)
-                a2 = coord.TCoord3D(-.5*a, .5*a, .5*a)
-                a3 = coord.TCoord3D(-.5*a, -.5*a, .5*a)
+                a1 = coord.TCoord3D(.5 * a, .5 * a, .5 * a)
+                a2 = coord.TCoord3D(-.5 * a, .5 * a, .5 * a)
+                a3 = coord.TCoord3D(-.5 * a, -.5 * a, .5 * a)
             elif lattice_type == ibrav.CUBIC_BCC_EXTRA:
-                a1 = coord.TCoord3D(-.5*a, .5*a, .5*a)
-                a2 = coord.TCoord3D(.5*a, -.5*a, .5*a)
-                a3 = coord.TCoord3D(.5*a, .5*a, -.5*a)
+                a1 = coord.TCoord3D(-.5 * a, .5 * a, .5 * a)
+                a2 = coord.TCoord3D(.5 * a, -.5 * a, .5 * a)
+                a3 = coord.TCoord3D(.5 * a, .5 * a, -.5 * a)
             elif lattice_type == ibrav.MONOCLINIC_UB:
                 # monoclinic, unique axis b
                 a1 = coord.TCoord3D(a, 0, 0)
                 a2 = coord.TCoord3D(0, b, 0)
-                a3 = coord.TCoord3D(c*np.cos(beta), 0, c*np.sin(beta))
+                a3 = coord.TCoord3D(c * np.cos(beta), 0, c * np.sin(beta))
             elif lattice_type == ibrav.OTHER:
                 # other lattice type - a1 a2 a3 defined manually - so don't worry
                 pass
@@ -467,15 +465,15 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                 # don't bother with basis if ALAT - just multiply all the coordinates by a!
                 # sort out the atoms:
                 for basis_atom in atomic_basis:
-                    basis_atom.position = basis_atom.position*a
+                    basis_atom.position = basis_atom.position * a
 
                 # sort out the perturbed pairs
                 for perturbed_pair in perturbed_distances:
-                    perturbed_pair[0] = perturbed_pair[0]*a
-                    perturbed_pair[1] = perturbed_pair[1]*a
+                    perturbed_pair[0] = perturbed_pair[0] * a
+                    perturbed_pair[1] = perturbed_pair[1] * a
 
                 # finally, do the muon
-                muon_position = muon_position*a
+                muon_position = muon_position * a
             else:
                 # we're in cartesian-land with the distances given in angstroms - so do nothing!
                 pass
@@ -492,10 +490,19 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
                                perturbed_distances, squish_radius)
 
+        # if ask_each_atom is True, ask the user if they want to include each individual atom
+        if ask_each_atom:
+            approved_nnn_atoms = []
+            for this_nnn_atom in nnn_atoms:
+                if AtomObtainer.query_yes_no('Include ' + str(this_nnn_atom) + '?'):
+                    approved_nnn_atoms.append(this_nnn_atom)
+            nnn_atoms = approved_nnn_atoms
+
         # as before, make a list of spins to calculate (including that of the muon)
         All_Spins = [muon]
         for i_atom in nnn_atoms:
-            All_Spins.append(atom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
+            All_Spins.append(
+                atom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
 
     # print the atoms in the list
     for i_atom in All_Spins:
@@ -512,7 +519,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
     # count the number of combinations of isotopes
     isotope_combinations = 1
     for atoms in All_Spins:
-        isotope_combinations = isotope_combinations*len(atoms)
+        isotope_combinations = isotope_combinations * len(atoms)
     if not shutup:
         print(str(isotope_combinations) + ' isotope combination(s) found')
 
@@ -534,9 +541,9 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             probability = probability * All_Spins[atomid][current_isotope_ids[atomid]].abundance
 
         # create measurement operators for the muon's spin
-        muon_spin_x = measure_ith_spin(Spins, 0, Spins[0].pauli_x)
-        muon_spin_y = measure_ith_spin(Spins, 0, Spins[0].pauli_y)
-        muon_spin_z = measure_ith_spin(Spins, 0, Spins[0].pauli_z)
+        muon_spin_x = 2*measure_ith_spin(Spins, 0, Spins[0].pauli_x)
+        muon_spin_y = 2*measure_ith_spin(Spins, 0, Spins[0].pauli_y)
+        muon_spin_z = 2*measure_ith_spin(Spins, 0, Spins[0].pauli_z)
 
         # calculate hamiltonian
         hamiltonian = calc_total_hamiltonian(Spins)
@@ -554,10 +561,10 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         # Calculate constant (lab book 1 page 105)
         thisconst = 0
         for i in range(0, len(R)):
-            thisconst = thisconst + pow(abs(Rinv[i]*muon_spin_x*R[:, i]), 2) \
-                            + pow(abs(Rinv[i]*muon_spin_y*R[:, i]), 2) \
-                            + pow(abs(Rinv[i]*muon_spin_z*R[:, i]), 2)
-        const = const + probability*thisconst/(6*(muon_spin_x.shape[0]/2))
+            thisconst = thisconst + pow(abs(Rinv[i] * muon_spin_x * R[:, i]), 2) \
+                        + pow(abs(Rinv[i] * muon_spin_y * R[:, i]), 2) \
+                        + pow(abs(Rinv[i] * muon_spin_z * R[:, i]), 2)
+        const = const + probability * thisconst / (6 * (muon_spin_x.shape[0] / 2))
 
         this_amplitude = np.zeros((len(R), len(R)))
         # now calculate oscillating term
@@ -566,22 +573,21 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             Ry = Rinv[i] * muon_spin_y
             Rz = Rinv[i] * muon_spin_z
             if not shutup:
-                print(str(100*i/len(R)) + '% complete...')
+                print(str(100 * i / len(R)) + '% complete...')
             if fourier_2d:
                 jmin = 0
             else:
-                jmin = i+1
+                jmin = i + 1
             for j in range(jmin, len(R)):
-                this_amplitude[i][j] = (pow(abs(Rx*R[:, j]), 2)
-                                        + pow(abs(Ry*R[:, j]), 2)
-                                        + pow(abs(Rz*R[:, j]), 2))*probability / (3*(muon_spin_x.shape[0]/2))
+                this_amplitude[i][j] = (pow(abs(Rx * R[:, j]), 2)
+                                        + pow(abs(Ry * R[:, j]), 2)
+                                        + pow(abs(Rz * R[:, j]), 2)) * probability / (3 * (muon_spin_x.shape[0] / 2))
 
         amplitude.append(this_amplitude.tolist())
         E.append(this_E.tolist())
 
         # increment the isotope ids
         current_isotope_ids = inc_isotope_id(basis=number_isotopes, oldids=current_isotope_ids)
-
 
     ## OUTPUT ##
 
@@ -609,47 +615,47 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         if fourier_2d:
             fourier_result = sorted(fourier_result, key=lambda frequency: (frequency[1], frequency[2]))
             i = 0
-            while i < len(fourier_result)-1:
+            while i < len(fourier_result) - 1:
                 # test for degeneracy (up to a tolerance for machine precision)
-                if (abs((fourier_result[i][1]) - (fourier_result[i+1][1])) < tol) \
-                        and (abs(fourier_result[i][2] - fourier_result[i+1][2]) < tol):
+                if (abs((fourier_result[i][1]) - (fourier_result[i + 1][1])) < tol) \
+                        and (abs(fourier_result[i][2] - fourier_result[i + 1][2]) < tol):
                     # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                        fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0],
-                                             fourier_result[i][1], fourier_result[i][2])
-                        # remove the i+1th (degenerate) eigenvalue
-                        del fourier_result[i + 1]
+                    fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0],
+                                         fourier_result[i][1], fourier_result[i][2])
+                    # remove the i+1th (degenerate) eigenvalue
+                    del fourier_result[i + 1]
                 else:
                     i = i + 1
             # and sort and dedegenerate again...
             fourier_result = sorted(fourier_result, key=lambda frequency: (frequency[2], frequency[1]))
             i = 0
-            while i < len(fourier_result)-1:
+            while i < len(fourier_result) - 1:
                 # test for degeneracy (up to a tolerance for machine precision)
-                if (abs(fourier_result[i][1] - fourier_result[i+1][1]) < tol)\
-                        and (abs(fourier_result[i][2] - fourier_result[i+1][2]) < tol):
+                if (abs(fourier_result[i][1] - fourier_result[i + 1][1]) < tol) \
+                        and (abs(fourier_result[i][2] - fourier_result[i + 1][2]) < tol):
                     # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                        fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0],
-                                             fourier_result[i][1], fourier_result[i][2])
-                        # remove the i+1th (degenerate) eigenvalue
-                        del fourier_result[i + 1]
+                    fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0],
+                                         fourier_result[i][1], fourier_result[i][2])
+                    # remove the i+1th (degenerate) eigenvalue
+                    del fourier_result[i + 1]
                 else:
                     i = i + 1
         else:
             fourier_result = sorted(fourier_result, key=lambda frequency: frequency[1])
             i = 0
-            while i < len(fourier_result)-1:
+            while i < len(fourier_result) - 1:
                 # test for degeneracy (up to a tolerance for machine precision)
-                if abs((fourier_result[i][1]) - (fourier_result[i+1][1])) < tol:
+                if abs((fourier_result[i][1]) - (fourier_result[i + 1][1])) < tol:
                     # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                    fourier_result[i] = (fourier_result[i][0] + fourier_result[i+1][0], fourier_result[i][1])
+                    fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0], fourier_result[i][1])
                     # remove the i+1th (degenerate) eigenvalue
-                    del fourier_result[i+1]
+                    del fourier_result[i + 1]
                 else:
                     i = i + 1
 
             i = 0
             # now remove any amplitudes which are less than 1e-15
-            while i < len(fourier_result)-1:
+            while i < len(fourier_result) - 1:
                 if abs(fourier_result[i][0]) < 1e-7:
                     # remove the entry
                     del fourier_result[i]
@@ -700,7 +706,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                           perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
                           exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
                           lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
-                          timestep=times[1]-times[0])
+                          timestep=times[1] - times[0])
             outfile.writelines('! t P_average \n')
             write_to_file(outfile, times, P_average)
             outfile.close()
