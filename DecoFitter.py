@@ -10,20 +10,27 @@ import matplotlib.pyplot as pyplot  # for plotting
 import matplotlib.colors as color
 
 
+# squish_radius initial values (made global so that we can fix)
+squish_radii_initial = [1.172211, 3.04]
+# which nnnness are we squishing?
+squish_radius_nnnness_vary = 3
+
 def main():
 
     # load in the data (expect it of the form x y yerr)
     x, y, y_error = load_muon_data('76785.dat')
 
-    # try to do a fit
-    initial_guess = [31.97, 1.171909, 0]
-    # params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_guess, sigma=y_error)
-    # params_errors = np.sqrt(np.diag(covariances))
-    #
-    # print(params)
-    # print(params_errors)
+    # work out which squish radius to vary
+    squish_radius = squish_radii_initial[squish_radius_nnnness_vary - 2]
 
-    params = initial_guess
+    # try to do a fit
+    initial_guess = [35.0795, squish_radius, 0.01122]
+    params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_guess, sigma=y_error)
+    params_errors = np.sqrt(np.diag(covariances))
+
+    print(params)
+    print(params_errors)
+
     # calculate the fit function one last time
     fit_func = fit_function(x, params[0], params[1], params[2])
     # find the chi squared
@@ -61,7 +68,11 @@ def fit_function(x, A, squish, A0):
     # define muon position
     muon_position = coord(.25, 0.25, 0.5)
 
-    deco = DecoherenceCalculator.calc_decoherence(muon_position=muon_position, times=x, squish_radius=squish,
+    # make the squish radii
+    squish_radii = squish_radii_initial
+    squish_radii[squish_radius_nnnness_vary - 2] = squish
+
+    deco = DecoherenceCalculator.calc_decoherence(muon_position=muon_position, times=x, squish_radius=squish_radii,
                                                   lattice_type=lattice_type, lattice_parameter=lattice_parameter,
                                                   lattice_angles=lattice_angles, input_coord_units=input_coord_units,
                                                   atomic_basis=atomic_basis, perturbed_distances=perturbed_distances,

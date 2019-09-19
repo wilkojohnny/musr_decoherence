@@ -47,7 +47,7 @@ class position_units(Enum):
 
 
 # nnn finder
-def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, perturbations=None, squish_radius=None):
+def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, perturbations=None, squish_radii=None):
     # function which returns an array of TCoord3D of the nn etc
     # nn parameter: =2 for nn, 3 for nnn, 4 for nnnn...
     # nn_pert_distance: distance of the nn bond, set to None if perturbing manually/not perturbing at all
@@ -108,24 +108,25 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
     nearestneighbours.sort(key=lambda atom: atom[0])
 
     # find the closest two F atoms, and perturb by means of squisification
-    closest_F_radius = 0
-    for atom in nearestneighbours:
-        if atom[2].name == 'F':
-            if closest_F_radius == 0:
-                closest_F_radius = atom[0]  # if no Fs have been registered yet, use this radius as the reference
-            elif (atom[0] - closest_F_radius) < 1e-3:
-                # this atom is also a nn
-                pass
-            else:
-                break
-            # if we get here, it means this atom needs squishification (if desired)
-            if squish_radius is not None:
-                atom[0] = squish_radius
-                atom[1].set_r(squish_radius, muon.position)
-                atom[2].position = atom[1]
+    ## the below squishification code is crap - so rmed
+    # closest_F_radius = 0
+    # for atom in nearestneighbours:  # atom is [mu-atom distance, position, TDecoherenceAtom object]
+    #     if atom[2].name == 'F':
+    #         if closest_F_radius == 0:
+    #             closest_F_radius = atom[0]  # if no Fs have been registered yet, use this radius as the reference
+    #         elif (atom[0] - closest_F_radius) < 1e-3:
+    #             # this atom is also a nn
+    #             pass
+    #         else:
+    #             break
+    #         # if we get here, it means this atom needs squishification (if desired)
+    #         if squish_radius is not None:
+    #             atom[0] = squish_radius
+    #             atom[1].set_r(squish_radius, muon.position)
+    #             atom[2].position = atom[1]
 
     # sort the list by radius (just the beginning atoms might've changed)
-    nearestneighbours.sort(key=lambda atom: atom[0])
+    # nearestneighbours.sort(key=lambda atom: atom[0]) ## .. probably wrote this after a wine and cheese!!
 
     # now see what the radii are, and only spit out what we need
     current_nn = 1
@@ -143,6 +144,15 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
             current_radius = atom[0]
         # if we're at the right nn, add this to the list
         if (current_nn <= nn and not exclusive_nnnness) or (current_nn == nn and exclusive_nnnness):
+            # if this is due for squishification, then squish
+            try:
+                squish_radius = squish_radii[current_nn-2]
+                if squish_radius is not None:
+                    atom[0] = squish_radius
+                    atom[1].set_r(squish_radius, muon.position)
+                    atom[2].position = atom[1]
+            except IndexError:
+                pass
             chopped_nn.append(atom)
 
     # return the nn asked for
@@ -319,7 +329,7 @@ def main():
     # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
     # (don't forget to define nnnness!)
 
-    squish_radius = 1.172211  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    squish_radii = [1.172211, 2.5]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
@@ -351,11 +361,11 @@ def main():
     # define muon position
     muon_position = coord.TCoord3D(.25, 0.25, 0.5)
 
-    calc_decoherence(muon_position=muon_position, squish_radius=squish_radius, lattice_type=lattice_type,
+    calc_decoherence(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                      lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                      input_coord_units=input_coord_units, atomic_basis=atomic_basis,
                      perturbed_distances=perturbed_distances, plot=True, nnnness=3,
-                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0,5,0.1))
+                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0,10,0.1))
 
 
 def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0.1),
