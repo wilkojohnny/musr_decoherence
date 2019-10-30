@@ -364,11 +364,13 @@ def main():
     calc_decoherence(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                      lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                      input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                     perturbed_distances=perturbed_distances, plot=True, nnnness=3,
-                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0,10,0.1))
+                     perturbed_distances=perturbed_distances, plot=True, nnnness=3, ask_each_atom=True,
+                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0, 10, 0.1))
 
 
-def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0.1),
+# from input data, generate a vector [..] of TDecoherenceAtoms which have positions in a muon-centred basis.
+# return muon, All_spins, success
+def get_spins(muon_position, squish_radius=None,
                      # arguments for manual input of lattice
                      lattice_type=None, lattice_parameter=None, lattice_angles=None,
                      input_coord_units=position_units.ALAT, atomic_basis=None, perturbed_distances=None,
@@ -377,14 +379,12 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                      # arguments for XTL or manual input
                      nnnness=2, exclusive_nnnness=False,
                      # arguments for pw.x output
-                     use_pw_output=False, pw_output_file_location=None, no_atoms=0,
-                     # other arguments
-                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False,
-                     ask_each_atom=False):
+                     use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False):
+
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
         print('Cannot use pw and xtl inputs simultaneously. Aborting...')
-        return times * 0
+        return None, None, False
 
     # check that everything is in order: if not, then leave
     if not use_pw_output and not use_xtl_input:
@@ -392,15 +392,15 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         if lattice_type is None or lattice_parameter is None or lattice_angles is None or atomic_basis is None or \
                 perturbed_distances is None:
             print('Not enough information given. Aborting...')
-            return times * 0
+            return None, None, False
     elif use_pw_output:
         if pw_output_file_location is None or no_atoms <= 0:
             print('Not enough information given. Aborting...')
-            return times * 0
+            return None, None, False
     else:
         if xtl_input_location is None:
             print('Not enough information given. Aborting...')
-            return times * 0
+            return None, None, False
 
     if use_pw_output:
         # get the atoms from the Quantum Espresso pw.x output, and put into an array
@@ -418,9 +418,6 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             alpha = lattice_angles[0] * np.pi / 180.
             beta = lattice_angles[1] * np.pi / 180.
             gamma = lattice_angles[2] * np.pi / 180.
-
-            # type of calculation - can't do fourier2d if not fourier
-            fourier_2d = fourier_2d and fourier
 
             # define primitive vectors a1, a2 and a3, from pw.x input description
             if lattice_type == ibrav.CUBIC_SC:
@@ -522,6 +519,31 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
     for spin in All_Spins:
         for isotopeid in range(0, len(spin)):
             spin[isotopeid].position = spin[isotopeid].position - muon_position
+
+    return muon, All_Spins, True
+
+def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0.1),
+                     # arguments for manual input of lattice
+                     lattice_type=None, lattice_parameter=None, lattice_angles=None,
+                     input_coord_units=position_units.ALAT, atomic_basis=None, perturbed_distances=None,
+                     # arguments for XTL
+                     use_xtl_input=False, xtl_input_location=None,
+                     # arguments for XTL or manual input
+                     nnnness=2, exclusive_nnnness=False,
+                     # arguments for pw.x output
+                     use_pw_output=False, pw_output_file_location=None, no_atoms=0,
+                     # other arguments
+                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False,
+                     ask_each_atom=False):
+
+    # type of calculation - can't do fourier2d if not fourier
+    fourier_2d = fourier_2d and fourier
+
+    # get the atoms and the muon
+    muon, All_Spins, got_atoms = get_spins(muon_position, squish_radius, lattice_type, lattice_parameter, lattice_angles,
+                                         input_coord_units, atomic_basis, perturbed_distances, use_xtl_input,
+                                         xtl_input_location, nnnness, exclusive_nnnness, use_pw_output,
+                                         pw_output_file_location, no_atoms, ask_each_atom)
 
     # count number of spins
     N_spins = len(All_Spins) - 1
