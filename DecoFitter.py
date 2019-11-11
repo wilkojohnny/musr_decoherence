@@ -11,7 +11,7 @@ import matplotlib.colors as color
 
 
 # squish_radius initial values (made global so that we can fix)
-squish_radii_initial = [1.172211, 3.04]
+squish_radii_initial = [1.172211, 2.79623945]
 # which nnnness are we squishing?
 squish_radius_nnnness_vary = 3
 
@@ -24,12 +24,15 @@ def main():
     squish_radius = squish_radii_initial[squish_radius_nnnness_vary - 2]
 
     # try to do a fit
-    initial_guess = [35.0795, squish_radius, 0.01122]
-    params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_guess, sigma=y_error)
-    params_errors = np.sqrt(np.diag(covariances))
+    #initial_guess = [35.0795, squish_radius, 0.01122]
+    initial_guess = [8.70375687, squish_radius, 0.04102239]
+    #params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_guess, sigma=y_error)
+    # params_errors = np.sqrt(np.diag(covariances))
+    #
+    # print(params)
+    # print(params_errors)
 
-    print(params)
-    print(params_errors)
+    params = initial_guess
 
     # calculate the fit function one last time
     fit_func = fit_function(x, params[0], params[1], params[2])
@@ -76,7 +79,8 @@ def fit_function(x, A, squish, A0):
                                                   lattice_type=lattice_type, lattice_parameter=lattice_parameter,
                                                   lattice_angles=lattice_angles, input_coord_units=input_coord_units,
                                                   atomic_basis=atomic_basis, perturbed_distances=perturbed_distances,
-                                                  plot=False, nnnness=3, shutup=True)
+                                                  plot=False, nnnness=3, shutup=False,
+                                                  outfile_location='CaF2_nnnsquish_output.dat')
 
     return A*deco + A0*np.ones(len(x))
 
