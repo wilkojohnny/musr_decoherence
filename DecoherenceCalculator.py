@@ -217,13 +217,28 @@ def calc_hamiltonian_term(spins, i, j):
 
 
 # calculate entire hamiltonian
-def calc_total_hamiltonian(spins):
+def calc_dipolar_hamiltonian(spins):
     current_hamiltonian = 0
 
     # calculate hamiltonian for each pair and add onto sum
     for i in range(0, len(spins)):
         for j in range(i + 1, len(spins)):
             current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
+    return current_hamiltonian
+
+
+def calc_zeeman_hamiltonian(spins, field: coord.TCoord3D):
+    current_hamiltonian = 0
+
+    # for each atom
+    for i in range(0, len(spins)):
+        # calculate the Hamiltonian
+        Sx = measure_ith_spin(spins, i, spins[i].pauli_x)
+        Sy = measure_ith_spin(spins, i, spins[i].pauli_y)
+        Sz = measure_ith_spin(spins, i, spins[i].pauli_z)
+        current_hamiltonian = current_hamiltonian - spins[i].gyromag_ratio * (field.ortho_x * Sx
+                                                                              + field.ortho_y * Sy
+                                                                              + field.ortho_z * Sz)
     return current_hamiltonian
 
 
@@ -241,10 +256,11 @@ def calc_p_average_t(t, const, amplitude, E):
     return const + osc_term
 
 
-# do file preamble
-def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None, fourier_2d=None,
-                  tol=None, use_xtl_input=None, xtl_input_location=None, use_pw_output=None, perturbed_distances=None,
-                  squish_radius=None, nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
+# do decoherence file preamble
+def decoherence_file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None,
+                              fourier_2d=None, tol=None, use_xtl_input=None, xtl_input_location=None,
+                              use_pw_output=None, perturbed_distances=None, squish_radius=None, nnnness=None,
+                              exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
@@ -264,6 +280,15 @@ def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtim
         file.writelines('! absolute tolerance between eigenvalues to treat them as equivalent was ' + str(tol)
                         + '\n!\n')
 
+    atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input, xtl_input_location, use_pw_output,
+                        perturbed_distances, squish_radius, nnnness, exclusive_nnnness, lattice_type, lattice_parameter)
+
+    file.writelines('! start of data: \n')
+
+
+def atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input=None, xtl_input_location=None, use_pw_output=None,
+                        perturbed_distances=None, squish_radius=None, nnnness=None, exclusive_nnnness=None,
+                        lattice_type=None, lattice_parameter=None):
     # data source, if used
     if use_xtl_input:
         file.writelines('! Atom positional data was obtained from XTL (fractional crystal coordinate) file: ' +
@@ -309,7 +334,22 @@ def file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtim
         file.writelines('! lattice type: ' + str(lattice_type) + ' (based on QE convention) \n')
         file.writelines('! lattice parameter: ' + str(lattice_parameter) + ' Angstroms \n! \n')
 
-    file.writelines('! start of data: \n')
+
+def breit_rabi_file_preamble(file, field_polarisation, fields, muon_position, nn_atoms, use_xtl_input=None,
+                             xtl_input_location=None, use_pw_output=None, perturbed_distances=None, squish_radius=None,
+                             nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
+    # program name, date and time completed
+    file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
+
+    # get the git version
+    version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
+    file.writelines('! Using version ' + str(version_label) + '\n!\n')
+
+    file.writelines('! Breit-Rabi output, from ' + str(fields[0]) + 'G to ' + str(fields[-1]) + 'G.\n')
+    file.writelines('! Field was applied in the direction of ' + str(field_polarisation) + '\n!\n')
+
+    atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input, xtl_input_location, use_pw_output,
+                        perturbed_distances, squish_radius, nnnness, exclusive_nnnness, lattice_type, lattice_parameter)
 
 
 # batch write data to file
@@ -329,7 +369,7 @@ def main():
     # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
     # (don't forget to define nnnness!)
 
-    squish_radii = [1.172211, 2.5]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    squish_radii = [1.172211, None]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
@@ -368,11 +408,17 @@ def main():
     #                  perturbed_distances=perturbed_distances, plot=True, nnnness=3, ask_each_atom=False,
     #                  fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0, 10, 0.1))
 
-    calc_entropy(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
-                 lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
-                 muon_polarisation=muon_polarisation, input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                 perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False)
+    # calc_entropy(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
+    #              lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
+    #              muon_polarisation=muon_polarisation, input_coord_units=input_coord_units, atomic_basis=atomic_basis,
+    #              perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False)
 
+    calc_breit_rabi(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
+                    lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
+                    input_coord_units=input_coord_units, atomic_basis=atomic_basis,
+                    perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False,
+                    fields=np.arange(0, 40, 0.05), field_polarisation=coord.TCoord3D(1,0,0),
+                    outfile_location='/Users/johnny/Desktop/CaF2_xfield.dat', plot=True)
 
 
 # from input data, generate a vector [..] of TDecoherenceAtoms which have positions in a muon-centred basis.
@@ -549,9 +595,9 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
 
     # get the atoms and the muon
     muon, All_Spins, got_atoms = get_spins(muon_position, squish_radius, lattice_type, lattice_parameter, lattice_angles,
-                                         input_coord_units, atomic_basis, perturbed_distances, use_xtl_input,
-                                         xtl_input_location, nnnness, exclusive_nnnness, use_pw_output,
-                                         pw_output_file_location, no_atoms, ask_each_atom)
+                                           input_coord_units, atomic_basis, perturbed_distances, use_xtl_input,
+                                           xtl_input_location, nnnness, exclusive_nnnness, use_pw_output,
+                                           pw_output_file_location, no_atoms, ask_each_atom)
 
     # count number of spins
     N_spins = len(All_Spins) - 1
@@ -586,7 +632,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         muon_spin_z = 2*measure_ith_spin(Spins, 0, Spins[0].pauli_z)
 
         # calculate hamiltonian
-        hamiltonian = calc_total_hamiltonian(Spins)
+        hamiltonian = calc_dipolar_hamiltonian(Spins)
 
         # find eigenvalues and eigenvectors of hamiltonian
         if not shutup:
@@ -706,12 +752,12 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
         if outfile_location is not None:
             outfile = open(outfile_location, "w")
             # do preamble
-            file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
-                          fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
-                          xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
-                          perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
-                          exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
-                          lattice_parameter=lattice_parameter)
+            decoherence_file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
+                                      fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
+                                      xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
+                                      perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
+                                      exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
+                                      lattice_parameter=lattice_parameter)
 
             if fourier_2d:
                 outfile.writelines('! frequency1 frequency2 amplitude \n')
@@ -740,13 +786,13 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             # dump results in a file if requested
             outfile = open(outfile_location, "w")
             # do preamble
-            file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
-                          fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
-                          xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
-                          perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
-                          exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
-                          lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
-                          timestep=times[1] - times[0])
+            decoherence_file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
+                                      fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
+                                      xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
+                                      perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
+                                      exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
+                                      lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
+                                      timestep=times[1] - times[0])
             outfile.writelines('! t P_average \n')
             write_to_file(outfile, times, P_average)
             outfile.close()
@@ -846,6 +892,7 @@ def trace(matrix, left_dim: int = 0, right_dim: int = 0):
 
 # look up python compiler
 
+
 # do x*log(x) of a matrix (takes into account lim(x->0)xlogx = 0)
 def xlogx(x):
     # diagonalise x
@@ -861,6 +908,96 @@ def xlogx(x):
 
     # return xlogx
     return R*E*Rinv
+
+
+def calc_breit_rabi(muon_position, squish_radius=None, fields=np.arange(0, 1, 1e3),
+                    field_polarisation=coord.TCoord3D(0, 0, 1),
+                    # arguments for manual input of lattice
+                    lattice_type=None, lattice_parameter=None, lattice_angles=None,
+                    input_coord_units=position_units.ALAT, atomic_basis=None, perturbed_distances=None,
+                    # arguments for XTL
+                    use_xtl_input=False, xtl_input_location=None,
+                    # arguments for XTL or manual input
+                    nnnness=2, exclusive_nnnness=False,
+                    # arguments for pw.x output
+                    use_pw_output=False, pw_output_file_location=None, no_atoms=0,
+                    # other arguments
+                    outfile_location=None, plot=False,
+                    ask_each_atom=False):
+
+    # if no outfile nor plot is initiated, no point in continuing...
+    assert not (outfile_location is None and plot is False)
+
+    # normalise the magnetic field polarisation vector
+    field_polarisation = field_polarisation / field_polarisation.r()
+
+    # get the atoms and the muon
+    muon, All_Spins, got_atoms = get_spins(muon_position, squish_radius, lattice_type, lattice_parameter,
+                                           lattice_angles,
+                                           input_coord_units, atomic_basis, perturbed_distances, use_xtl_input,
+                                           xtl_input_location, nnnness, exclusive_nnnness, use_pw_output,
+                                           pw_output_file_location, no_atoms, ask_each_atom)
+
+    # work out how many energies we should have
+    num_energies = 1
+    for spin in All_Spins:
+        num_energies *= spin.II + 1
+
+    # open the output file
+    output_file = None
+    if outfile_location is not None:
+        # set up the output file
+        output_file = open(outfile_location, 'w+')
+        breit_rabi_file_preamble(output_file, field_polarisation, fields, muon_position, All_Spins, use_xtl_input,
+                                 xtl_input_location, use_pw_output, perturbed_distances, squish_radius, nnnness,
+                                 exclusive_nnnness, lattice_type, lattice_parameter)
+        output_file.write('! field (G) ')
+        for i in range(0, num_energies):
+            output_file.write('E' + str(i) + ' (MHz) ')
+        output_file.write('\n')
+
+    # calculate the dipolar Hamiltonian
+    dipolar_hamiltonian = calc_dipolar_hamiltonian(All_Spins)
+
+    # if plotting, set up the arrays to plot
+    energies = None
+    if plot:
+        energies = np.zeros((num_energies, len(fields)))
+
+
+    for i_field in range(0, len(fields)):
+        # calculate the Zeeman terms
+        field_v = field_polarisation*fields[i_field]*1e-4
+        hamiltonian = dipolar_hamiltonian + calc_zeeman_hamiltonian(All_Spins, field_v)
+
+        # print out the current field as a status update
+        print('Field: ' + str(fields[i_field]) + 'G')
+
+        # diagonalise the Hamiltonian
+        E, R = linalg.eigh(hamiltonian.todense())
+
+        # append the eigenvalues to the list if plotting (no reason to save them otherwises...)
+        if plot:
+            energies[:, i_field] = E
+
+        # write to file
+        if output_file is not None:
+            output_file.write(str(fields[i_field]) + ' ')
+            for energy in E:
+                output_file.write(str(energy) + ' ')
+            output_file.write('\n')
+
+    if plot:
+        for i in range(0, num_energies):
+            pyplot.plot(fields, energies[i, :])
+        pyplot.xlabel('Field (G)')
+        pyplot.ylabel('E /MHz')
+        pyplot.title('F-mu-F, Field in x-direction')
+        pyplot.show()
+
+    if output_file is not None:
+        output_file.close()
+
 
 if __name__ == '__main__':
     main()

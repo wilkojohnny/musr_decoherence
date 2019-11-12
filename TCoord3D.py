@@ -57,13 +57,22 @@ class TCoord3D:
 
     # get normalised variables: defined as self*TCoord3D(0,1,0)/abs(this) ((* <-> dot product))
     def xhat(self):
-        return self * TCoord3D(1, 0, 0) / self.r()
+        if self.r() != 0:
+            return self * TCoord3D(1, 0, 0) / self.r()
+        else:
+            return 0
 
     def yhat(self):
-        return self * TCoord3D(0, 1, 0) / self.r()
+        if self.r() != 0:
+            return self * TCoord3D(0, 1, 0) / self.r()
+        else:
+            return 0
 
     def zhat(self):
-        return self * TCoord3D(0, 0, 1) / self.r()
+        if self.r() != 0:
+            return self * TCoord3D(0, 0, 1) / self.r()
+        else:
+            return 0
 
     def totuple(self):
         return self.ortho_x, self.ortho_y, self.ortho_z,
@@ -123,6 +132,12 @@ class TCoord3D:
         elif isinstance(other, TCoord3D):
             # do the dot product
             return other.ortho_x * self.ortho_x + other.ortho_y * self.ortho_y + other.ortho_z * self.ortho_z
+        else:
+            return NotImplemented
+
+    def __truediv__(self, other):
+        if isinstance(other, float):
+            return TCoord3D(self.crystal_x / other, self.crystal_y / other, self.crystal_z / other, self.basis)
         else:
             return NotImplemented
 
