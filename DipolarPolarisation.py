@@ -3,7 +3,7 @@
 # John Wilkinson 15/11/19
 
 import subprocess  # gets git version
-import datetime  # allows one to print out date and time
+from datetime import datetime  # allows one to print out date and time
 import DecoherenceCalculator as decoCalc  # allows one to calculate decoherence
 from MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
 import AtomObtainer  # allows one to play with atoms
@@ -16,8 +16,8 @@ import matplotlib.pyplot as pyplot  # plotting
 # do decoherence file preamble
 def decoherence_file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None,
                               fourier_2d=None, tol=None, use_xtl_input=None, xtl_input_location=None,
-                              use_pw_output=None, perturbed_distances=None, squish_radius=None, nnnness=None,
-                              exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
+                              use_pw_output=None, pw_output_location=None, perturbed_distances=None, squish_radius=None,
+                              nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
@@ -38,7 +38,8 @@ def decoherence_file_preamble(file, muon_position, nn_atoms, fourier, starttime=
                         + '\n!\n')
 
     AtomObtainer.atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input, xtl_input_location, use_pw_output,
-                        perturbed_distances, squish_radius, nnnness, exclusive_nnnness, lattice_type, lattice_parameter)
+                                     pw_output_location, perturbed_distances, squish_radius, nnnness, exclusive_nnnness,
+                                     lattice_type, lattice_parameter)
 
     file.writelines('! start of data: \n')
 
@@ -250,7 +251,7 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
                                       xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
                                       perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
                                       exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
-                                      lattice_parameter=lattice_parameter)
+                                      lattice_parameter=lattice_parameter, pw_output_location=pw_output_file_location)
 
             if fourier_2d:
                 outfile.writelines('! frequency1 frequency2 amplitude \n')
@@ -282,8 +283,9 @@ def calc_decoherence(muon_position, squish_radius=None, times=np.arange(0, 10, 0
             decoherence_file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
                                       fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
                                       xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
-                                      perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
-                                      exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
+                                      pw_output_location=pw_output_file_location,
+                                      perturbed_distances=perturbed_distances, squish_radius=squish_radius,
+                                      nnnness=nnnness, exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
                                       lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
                                       timestep=times[1] - times[0])
             outfile.writelines('! t P_average \n')
@@ -305,14 +307,18 @@ def main():
     #### INPUT ####
 
     # ## IF WE'RE USING PW_OUTPUT
-    # pw_output_file_location = 'CaF2.relax.mu.pwo'
-    # no_atoms = 11  # includes muon
+    pw_output_file_location = 'KPF6.relax.mu.1.pwo'
+    no_atoms = 10  # excludes muon
 
     ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
     # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
     # (don't forget to define nnnness!)
 
-    squish_radii = [1.172211, None]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+    # CaF2:
+    #squish_radii = [1.172211, None]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
+
+    # KPF6:
+    squish_radii = [None, None]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
 
     ## IF WE'RE NOT USING pw output:
     # nn, nnn, nnnn?
@@ -322,9 +328,16 @@ def main():
 
     ## IF NOT PW NOR XTL:
     # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
+    # CaF2:
     lattice_type = AtomObtainer.ibrav.CUBIC_FCC  # # can only do fcc and monoclinic (unique axis b)
     # lattice parameters and angles, in angstroms
     lattice_parameter = [5.44542, 0, 0]  # [a, b, c]
+    lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
+
+    # KPF6:
+    lattice_type = AtomObtainer.ibrav.CUBIC_SC  # # can only do sc, fcc and monoclinic (unique axis b)
+    # lattice parameters and angles, in angstroms
+    lattice_parameter = [10, 0, 0]  # [a, b, c]
     lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
 
     # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
@@ -332,24 +345,26 @@ def main():
 
     # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
     atomic_basis = [
+        # CaF2:
         # atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
         #     abundance=np.array([0.00145, 0.99855])),
-        atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name='F'),
-        atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name='F')
+        # atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name='F'),
+        # atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name='F')
+
     ]
 
     # register the perturbed distances
     perturbed_distances = []
 
     # define muon position
-    muon_position = coord.TCoord3D(.25, 0.25, 0.5)
-    muon_polarisation = coord.TCoord3D(0, 0, 1)
+    muon_position = coord.TCoord3D(.25, 0.25, 0.5)  # CaF2
 
     calc_decoherence(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                      lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                      input_coord_units=input_coord_units, atomic_basis=atomic_basis,
+                     use_pw_output=True, pw_output_file_location=pw_output_file_location, no_atoms=no_atoms,
                      perturbed_distances=perturbed_distances, plot=True, nnnness=3, ask_each_atom=True,
-                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0, 25, 0.1))
+                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0, 25, 0.1), outfile_location='KPF6.deco.scf.1.10At.dat')
     return 1
 
 

@@ -3,108 +3,14 @@
 
 import AtomObtainer as AO  # get atoms
 from MDecoherenceAtom import TDecoherenceAtom as atom  # allows atom generation
+import DecoherenceCalculator  # for Hamiltonian etc
 import TCoord3D as coord  # coordinate tools
-from scipy import sparse, linalg  # allows dealing with sparse matrices and linear algebra tools
+import scipy.sparse as sparse  # allows dealing with sparse matrices and linear algebra tools
+import scipy.linalg as scilinalg  # stops this conflicting with numpy's linalg
 import numpy as np  # maths tools
-
-def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None,
-                     # arguments for manual input of lattice
-                     lattice_type=None, lattice_parameter=None, lattice_angles=None,
-                     input_coord_units=AO.position_units.ALAT, atomic_basis=None, perturbed_distances=None,
-                     # arguments for XTL
-                     use_xtl_input=False, xtl_input_location=None,
-                     # arguments for XTL or manual input
-                     nnnness=2, exclusive_nnnness=False,
-                     # arguments for pw.x output
-                     use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False):
-
-    muon, Spins, got_spins = AO.get_spins(muon_position, squish_radius, lattice_type, lattice_parameter, lattice_angles,
-                                          input_coord_units, atomic_basis, perturbed_distances, use_xtl_input,
-                                          xtl_input_location, nnnness, exclusive_nnnness, use_pw_output,
-                                          pw_output_file_location, no_atoms, ask_each_atom)
-
-    # create measurement operators for the muon's spin
-    muon_spin_x = 2*Spins[0].pauli_x
-    muon_spin_y = 2*Spins[0].pauli_y
-    muon_spin_z = 2*Spins[0].pauli_z
-
-    # generate density matrix (=.5(1+muon_rhat) x 1^N)
-    muon_spin_polariasation = muon_polarisation.ortho_x * muon_spin_x + muon_polarisation.ortho_y * muon_spin_y + \
-                              muon_polarisation.ortho_z * muon_spin_z
-
-    # calcualte the density matrix at time 0
-    density_matrix_0 = sparse.kron(0.5*(sparse.identity(2) + muon_spin_polariasation),
-                                   sparse.identity(pow(2, len(Spins)-1))) / pow(2, len(Spins)-1)
-
-    # do a partial trace
-    density_matrix_0 = trace(density_matrix_0.tocsr(), left_dim=2)
-
-    # do x*log(x)
-    rho_log_rho = xlogx(density_matrix_0)
-
-    # do trace
-    print(-1*trace(rho_log_rho))
-
-
-def trace(matrix, left_dim: int = 0, right_dim: int = 0):
-    # check matrix is square, and the input arguments are not silly
-    assert matrix.shape[0] == matrix.shape[1]
-    assert left_dim >= 0
-    assert left_dim >= 0
-
-    # if not doing partial trace, then
-    if left_dim == 0 and right_dim == 0:
-        current_trace = 0
-        for i in range(0, matrix.shape[0]):
-            current_trace += matrix[i][i]
-    elif left_dim > 0:
-        # trace over left dims
-        # calculate what the final dimension should be (will always be an integer)
-        res_dim = int(np.round(matrix.shape[0]/left_dim))
-        # set up final matrix (and allow it to be complex)
-        current_trace = np.zeros((res_dim, res_dim,), dtype=complex)
-        # for each element in the final matrix (i,j)
-        for i in range(0, res_dim):
-            for j in range(0, res_dim):
-                # sum over the indices
-                for s in range(0, left_dim):
-                    current_trace[i][j] = current_trace[i][j] + matrix[i + s*res_dim,j + s*res_dim]
-        current_trace = sparse.coo_matrix(current_trace)
-    elif right_dim > 0:
-        # trace over right dims
-        # calculate what the final dimension should be (will always be an integer)
-        res_dim = int(np.round(matrix.shape[0] / right_dim))
-        # set up final matrix (and allow it to be complex)
-        current_trace = np.zeros((res_dim, res_dim,), dtype=complex)
-        # for each element in the final matrix (i,j)
-        for i in range(0, res_dim):
-            for j in range(0, res_dim):
-                # sum over the indices
-                for s in range(0, right_dim):
-                    current_trace[i][j] = current_trace[i][j] + matrix[i*right_dim + s, j*right_dim + s]
-        current_trace = sparse.coo_matrix(current_trace)
-    else:
-        # something has gone horribly wrong!
-        assert False
-
-    return current_trace
-
-
-# do x*log(x) of a matrix (takes into account lim(x->0)xlogx = 0)
-def xlogx(x):
-    # diagonalise x
-    E, R, Rinv = linalg.eig(x.todense(), left=True, right=True)
-
-    # log each element in E, unless it's 0, then make it 0
-    for i in range(0, len(E)):
-        if E[i] != 0:
-            E[i] = E[i]*np.log(E[i])
-
-    # make E a matrix
-    E = sparse.diags(E)
-
-    # return xlogx
-    return R*E*Rinv
+import matplotlib.pyplot as pyplot  # plottting
+import subprocess  # git version
+from datetime import datetime  # for current date and time
 
 
 def main():
@@ -151,11 +57,190 @@ def main():
     muon_position = coord.TCoord3D(.25, 0.25, 0.5)
     muon_polarisation = coord.TCoord3D(0, 0, 1)
 
+    # file name
+    output_file_name = 'Entropy/z_polarised/FmuF_Fmuentropy.dat'
+
     calc_entropy(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                  lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                  muon_polarisation=muon_polarisation, input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                 perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False)
+                 perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False, times=np.arange(0, 10, 0.02),
+                 output_file_location=output_file_name)
     return 1
+
+
+def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, times=np.arange(0, 10, 0.1),
+                 output_file_location=None,
+                 # arguments for manual input of lattice
+                 lattice_type=None, lattice_parameter=None, lattice_angles=None,
+                 input_coord_units=AO.position_units.ALAT, atomic_basis=None, perturbed_distances=None,
+                 # arguments for XTL
+                 use_xtl_input=False, xtl_input_location=None,
+                 # arguments for XTL or manual input
+                 nnnness=2, exclusive_nnnness=False,
+                 # arguments for pw.x output
+                 use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False):
+
+    muon, Spins, got_spins = AO.get_spins(muon_position, squish_radius, lattice_type, lattice_parameter, lattice_angles,
+                                          input_coord_units, atomic_basis, perturbed_distances, use_xtl_input,
+                                          xtl_input_location, nnnness, exclusive_nnnness, use_pw_output,
+                                          pw_output_file_location, no_atoms, ask_each_atom)
+
+    # create measurement operators for the muon's spin
+    muon_spin_x = 2*Spins[0].pauli_x
+    muon_spin_y = 2*Spins[0].pauli_y
+    muon_spin_z = 2*Spins[0].pauli_z
+
+    # generate density matrix (=.5(1+muon_rhat) x 1^N)
+    muon_spin_polariasation = muon_polarisation.ortho_x * muon_spin_x + muon_polarisation.ortho_y * muon_spin_y + \
+                              muon_polarisation.ortho_z * muon_spin_z
+
+    # calcualte the density matrix at time 0
+    density_matrix_0 = sparse.kron(0.5*(sparse.identity(2, format="csc") + muon_spin_polariasation),
+                                   sparse.identity(pow(2, len(Spins)-1)), format="csc") / pow(2, len(Spins)-1)
+
+    # calculate the Hamiltonian
+    hamiltonian = DecoherenceCalculator.calc_dipolar_hamiltonian(Spins, just_muon_interactions=False)
+
+    # diagonalsie the Hamiltonian
+    E, R = np.linalg.eigh(hamiltonian.todense())
+    Rinv = R.H
+    Rsp = sparse.csc_matrix(R)
+    Rspinv = sparse.csc_matrix(Rinv)
+    E = sparse.diags(E, format='csc')
+
+    # set up output array
+    entropy_out = np.empty(shape=times.shape)
+
+    # partial trace dimensions - left (right) trace corresponds to tracing over the components which correspond to the
+    # density matrix kronecker product-ed with matrices of these dimensions on the left (right).
+    trace_left_dim = 0
+    trace_right_dim = 2
+
+    # file open and preamble (if applicable)
+    output_file = None
+    if output_file_location is not None:
+        # open the output file in write mode
+        output_file = open(output_file_location, 'w')
+
+        # program name, date and time completed
+        output_file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                               '\n!\n')
+
+        # get the git version
+        version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
+        output_file.writelines('! Using version ' + str(version_label) + '\n!\n')
+
+        # type of calculation
+        output_file.writelines('! Entropy time calculation completed between t=' + str(times[0]) + ' and ' +
+                               str(times[-1]) + ' with a timestep of ' + str(times[1]-times[0]) + ' microseconds' +
+                               '\n!\n')
+
+        output_file.writelines('! Muon initial polarisation is in the direction (' + str(muon_polarisation.ortho_x) +
+                               ', ' + str(muon_polarisation.ortho_y) + ', ' + str(muon_polarisation.ortho_z) + ') \n ')
+
+        output_file.writelines('! Calculation done by partial traces of left dimension ' + str(trace_left_dim) + ' and '
+                               + 'right dimension ' + str(trace_right_dim) + '. \n')
+
+        # do atoms preamble
+        AO.atoms_file_preamble(output_file, muon_position, Spins, use_xtl_input, xtl_input_location, use_pw_output,
+                               pw_output_file_location, perturbed_distances, squish_radius, nnnness, exclusive_nnnness,
+                               lattice_type, lattice_parameter)
+
+        output_file.writelines('! time (microseconds)  von Neumann Entropy (units of log2)\n')
+
+    for i_time in range(0, len(times)):
+        # get the time
+        time = times[i_time]
+        print(time)
+
+        # time evolve
+        expE = scilinalg.expm(E * 1j * time)
+        expEm = scilinalg.expm(- E * 1j * time)
+        density_matrix = Rsp*expEm*Rspinv*density_matrix_0*Rsp*expE*Rspinv
+
+        # do partial traces
+        if trace_right_dim != 0:
+            density_matrix = trace(density_matrix, right_dim=trace_right_dim)
+        if trace_left_dim != 0:
+            density_matrix = trace(density_matrix, left_dim=trace_left_dim)
+
+        # do x*log(x)
+        entropy = -1*tr_xlogx(density_matrix)
+
+        # if there is a big imaginary part of the trace, something has gone wrong...
+        assert entropy.imag < 1e-5
+
+        entropy_out[i_time] = entropy.real/np.log(2)
+
+        if output_file is not None:
+            output_file.writelines(str(time) + '\t' + str(entropy.real) + '\n')
+
+    print(entropy_out)
+    if output_file is not None:
+        output_file.close()
+    pyplot.plot(times, entropy_out, 'b')
+    pyplot.show()
+
+
+def trace(matrix, left_dim: int = 0, right_dim: int = 0):
+    # check matrix is square, and the input arguments are not silly
+    assert matrix.shape[0] == matrix.shape[1]
+    assert left_dim >= 0
+    assert left_dim >= 0
+
+    # declare current trace to shut up interpreter
+    current_trace = None
+
+    # if not doing partial trace, then
+    if left_dim == 0 and right_dim == 0:
+        current_trace = 0
+        for i in range(0, matrix.shape[0]):
+            current_trace += matrix[i][i]
+    if left_dim > 0:
+        # trace over left dims
+        # calculate what the final dimension should be (will always be an integer)
+        res_dim = int(np.round(matrix.shape[0]/left_dim))
+        # set up final matrix (and allow it to be complex)
+        current_trace = np.zeros((res_dim, res_dim,), dtype=complex)
+        # for each element in the final matrix (i,j)
+        for i in range(0, res_dim):
+            for j in range(0, res_dim):
+                # sum over the indices
+                for s in range(0, left_dim):
+                    current_trace[i][j] = current_trace[i][j] + matrix[i + s*res_dim,j + s*res_dim]
+        current_trace = sparse.csc_matrix(current_trace)
+    if right_dim > 0:
+        # trace over right dims
+        # calculate what the final dimension should be (will always be an integer)
+        res_dim = int(np.round(matrix.shape[0] / right_dim))
+        # set up final matrix (and allow it to be complex)
+        current_trace = np.zeros((res_dim, res_dim,), dtype=complex)
+        # for each element in the final matrix (i,j)
+        for i in range(0, res_dim):
+            for j in range(0, res_dim):
+                # sum over the indices
+                for s in range(0, right_dim):
+                    current_trace[i][j] = current_trace[i][j] + matrix[i*right_dim + s, j*right_dim + s]
+        current_trace = sparse.csc_matrix(current_trace)
+
+    return current_trace
+
+
+# do x*log(x) of a matrix (takes into account lim(x->0)xlogx = 0)
+def tr_xlogx(x):
+    # diagonalise x
+    E, R, Rinv = scilinalg.eig(x.todense(), left=True, right=True)
+
+    # log each element in E, unless it's 0, then make it 0
+    for i in range(0, len(E)):
+        if E[i] != 0:
+            E[i] = E[i]*np.log(E[i])
+
+    # make E a matrix
+    E = sparse.diags(E)
+
+    # return trace xlogx
+    return np.sum(E)
 
 
 if __name__=='__main__':

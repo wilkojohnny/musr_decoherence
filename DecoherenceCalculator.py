@@ -43,11 +43,17 @@ def calc_hamiltonian_term(spins, i, j):
 
 
 # calculate entire hamiltonian
-def calc_dipolar_hamiltonian(spins):
+def calc_dipolar_hamiltonian(spins, just_muon_interactions=False):
     current_hamiltonian = 0
 
+    # if just muon interaction, then only do interactions between i=0 and all j
+    if just_muon_interactions:
+        i_max = 1
+    else:
+        i_max = len(spins)
+
     # calculate hamiltonian for each pair and add onto sum
-    for i in range(0, len(spins)):
+    for i in range(0, i_max):
         for j in range(i + 1, len(spins)):
             current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
     return current_hamiltonian

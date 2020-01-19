@@ -7,7 +7,7 @@ import TCoord3D as coord  # 3D coordinates class
 import sys  # for user input
 import numpy as np  # for numpy arrays
 from enum import Enum
-
+import copy
 
 # class to define the enumerations for the different types of lattices available - same as pw.x
 class ibrav(Enum):
@@ -354,6 +354,8 @@ def get_spins(muon_position, squish_radius=None,
                      # arguments for pw.x output
                      use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False):
 
+    atomic_basis = copy.deepcopy(atomic_basis)
+
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
         print('Cannot use pw and xtl inputs simultaneously. Aborting...')
@@ -597,12 +599,12 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
             # if this is due for squishification, then squish
             try:
                 squish_radius = squish_radii[current_nn-2]
-                if squish_radius is not None:
-                    atom[0] = squish_radius
-                    atom[1].set_r(squish_radius, muon.position)
-                    atom[2].position = atom[1]
             except IndexError:
-                pass
+                squish_radius = None
+            if squish_radius is not None:
+                atom[0] = squish_radius
+                atom[1].set_r(squish_radius, muon.position)
+                atom[2].position = atom[1]
             chopped_nn.append(atom)
 
     # return the nn asked for
@@ -610,14 +612,14 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
 
 
 def atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input=None, xtl_input_location=None, use_pw_output=None,
-                        perturbed_distances=None, squish_radius=None, nnnness=None, exclusive_nnnness=None,
-                        lattice_type=None, lattice_parameter=None):
+                        pw_output_location=None, perturbed_distances=None, squish_radius=None, nnnness=None,
+                        exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
     # data source, if used
     if use_xtl_input:
         file.writelines('! Atom positional data was obtained from XTL (fractional crystal coordinate) file: ' +
                         xtl_input_location + '\n')
     if use_pw_output:
-        file.writelines('! Atom positional data was obtained from QE PWSCF file: ' + xtl_input_location + '\n')
+        file.writelines('! Atom positional data was obtained from QE PWSCF file: ' + pw_output_location + '\n')
 
     # Basis atoms, with gyromag ratios and I values
     for atom in nn_atoms:
