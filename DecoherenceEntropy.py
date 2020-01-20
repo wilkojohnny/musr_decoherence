@@ -58,18 +58,18 @@ def main():
     muon_polarisation = coord.TCoord3D(0, 0, 1)
 
     # file name
-    output_file_name = 'Entropy/z_polarised/FmuF_Fmuentropy.dat'
+    output_file_name = None #'Entropy/z_polarised/FmuF_Fmuentropy.dat'
 
     calc_entropy(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                  lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                  muon_polarisation=muon_polarisation, input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                 perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False, times=np.arange(0, 10, 0.02),
-                 output_file_location=output_file_name)
+                 perturbed_distances=perturbed_distances, nnnness=3, ask_each_atom=False, times=np.arange(0, 10, 0.02),
+                 output_file_location=output_file_name, plot=True)
     return 1
 
 
 def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, times=np.arange(0, 10, 0.1),
-                 output_file_location=None,
+                 output_file_location=None, plot=False,
                  # arguments for manual input of lattice
                  lattice_type=None, lattice_parameter=None, lattice_angles=None,
                  input_coord_units=AO.position_units.ALAT, atomic_basis=None, perturbed_distances=None,
@@ -108,13 +108,15 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
     Rspinv = sparse.csc_matrix(Rinv)
     E = sparse.diags(E, format='csc')
 
+    Rspinv_density0_Rsp = Rspinv*density_matrix_0*Rsp
+
     # set up output array
     entropy_out = np.empty(shape=times.shape)
 
     # partial trace dimensions - left (right) trace corresponds to tracing over the components which correspond to the
     # density matrix kronecker product-ed with matrices of these dimensions on the left (right).
-    trace_left_dim = 0
-    trace_right_dim = 2
+    trace_left_dim = 1024
+    trace_right_dim = 0
 
     # file open and preamble (if applicable)
     output_file = None
@@ -154,15 +156,22 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
         print(time)
 
         # time evolve
-        expE = scilinalg.expm(E * 1j * time)
-        expEm = scilinalg.expm(- E * 1j * time)
-        density_matrix = Rsp*expEm*Rspinv*density_matrix_0*Rsp*expE*Rspinv
+        Ejt = E * 1j * time
+        expE = scilinalg.expm(Ejt)
+        expEm = scilinalg.expm(-Ejt)
+        density_matrix = Rsp*expEm*Rspinv_density0_Rsp*expE*Rspinv
 
         # do partial traces
         if trace_right_dim != 0:
-            density_matrix = trace(density_matrix, right_dim=trace_right_dim)
+            if trace_right_dim <= 256:  # 256 found experimentally for 2028x2048 matrix
+                density_matrix = traces(density_matrix, right_dim=trace_right_dim)
+            else:
+                density_matrix = trace(density_matrix, right_dim=trace_right_dim)
         if trace_left_dim != 0:
-            density_matrix = trace(density_matrix, left_dim=trace_left_dim)
+            if trace_left_dim <= 256:  # 256 found experimentally for 2028x2048 matrix
+                density_matrix = traces(density_matrix, left_dim=trace_left_dim)
+            else:
+                density_matrix = trace(density_matrix, left_dim=trace_left_dim)
 
         # do x*log(x)
         entropy = -1*tr_xlogx(density_matrix)
@@ -178,21 +187,22 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
     print(entropy_out)
     if output_file is not None:
         output_file.close()
-    pyplot.plot(times, entropy_out, 'b')
-    pyplot.show()
+    if plot:
+        pyplot.plot(times, entropy_out, 'b')
+        pyplot.show()
 
 
 def trace(matrix, left_dim: int = 0, right_dim: int = 0):
     # check matrix is square, and the input arguments are not silly
     assert matrix.shape[0] == matrix.shape[1]
     assert left_dim >= 0
-    assert left_dim >= 0
+    assert right_dim >= 0
 
     # declare current trace to shut up interpreter
     current_trace = None
 
     # if not doing partial trace, then
-    if left_dim == 0 and right_dim == 0:
+    if left_dim == 0 and right_dim == 0:  # this usage of 0 is inconsistent -- this would be no trace...
         current_trace = 0
         for i in range(0, matrix.shape[0]):
             current_trace += matrix[i][i]
@@ -207,7 +217,7 @@ def trace(matrix, left_dim: int = 0, right_dim: int = 0):
             for j in range(0, res_dim):
                 # sum over the indices
                 for s in range(0, left_dim):
-                    current_trace[i][j] = current_trace[i][j] + matrix[i + s*res_dim,j + s*res_dim]
+                    current_trace[i][j] = current_trace[i][j] + matrix[i + s*res_dim, j + s*res_dim]
         current_trace = sparse.csc_matrix(current_trace)
     if right_dim > 0:
         # trace over right dims
@@ -225,6 +235,49 @@ def trace(matrix, left_dim: int = 0, right_dim: int = 0):
 
     return current_trace
 
+
+def traces(matrix, left_dim: int = 1, right_dim: int = 1):
+    # sparce traces (complete and partial), useful for big matrices
+    # see lab book 2 page 64
+
+    # check matrix is square, and the input arguments are not silly
+    assert matrix.shape[0] == matrix.shape[1]
+    assert left_dim >= 0
+    assert right_dim >= 0
+    # check its not being asked to do two traces at the same time
+    assert (left_dim > 1) != (right_dim > 1)
+
+    matrix_dim = matrix.shape[0]
+
+    # check its not being asked to trace over bigger matrices than matrix
+    assert (left_dim <= matrix_dim) and (right_dim <= matrix_dim)
+
+    # define size of orthonormal basis to do trace with
+    ortho_trace_dim = left_dim*(left_dim > 1) + right_dim*(right_dim > 1)
+    # left (and right) _identity_dim - size of the identity matrix to use (min these can be is 1...)
+    right_identity_dim = int(matrix_dim / left_dim - 1) * (left_dim > 1) + 1
+    left_identity_dim = int(matrix_dim / right_dim - 1) * (right_dim > 1) + 1
+    final_trace_dim = int(matrix_dim / ortho_trace_dim)
+
+    # declare current trace to shut up interpreter
+    current_trace = sparse.dia_matrix((final_trace_dim, final_trace_dim))
+
+    # for each element, find partial trace element, add to current_trace
+    for i in range(0, ortho_trace_dim):
+        # generate this orthogonal vector for PT
+        ortho_trace_elem = sparse.lil_matrix((ortho_trace_dim, 1))
+        ortho_trace_elem[i, 0] = 1
+        # put this in DIA format because kron likes that
+        ortho_trace_elem = sparse.dia_matrix(ortho_trace_elem)
+        # generate the right-multiply matrix
+        right_trace_mat = sparse.kron(sparse.eye(left_identity_dim),
+                                      sparse.kron(ortho_trace_elem, sparse.eye(right_identity_dim)))
+        # ... and the left
+        left_trace_mat = right_trace_mat.transpose()
+        # and find the trace element!
+        current_trace = current_trace + left_trace_mat*matrix*right_trace_mat
+
+    return current_trace
 
 # do x*log(x) of a matrix (takes into account lim(x->0)xlogx = 0)
 def tr_xlogx(x):
