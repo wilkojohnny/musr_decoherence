@@ -58,18 +58,22 @@ def main():
     muon_polarisation = coord.TCoord3D(0, 0, 1)
 
     # file name
-    output_file_name = None #'Entropy/z_polarised/FmuF_Fmuentropy.dat'
+    output_file_name = 'sertest.dat'
 
     calc_entropy(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                  lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                  muon_polarisation=muon_polarisation, input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                 perturbed_distances=perturbed_distances, nnnness=3, ask_each_atom=False, times=np.arange(0, 10, 0.02),
-                 output_file_location=output_file_name, plot=True)
+                 perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False, times=np.arange(0, 25, 0.02),
+                 output_file_location=output_file_name, plot=False, trace_left_dim=0, trace_right_dim=4)
+
     return 1
 
 
 def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, times=np.arange(0, 10, 0.1),
                  output_file_location=None, plot=False,
+                 # partial trace dimensions - left (right) trace corresponds to tracing over the components which correspond to the
+                 # density matrix kronecker product-ed with matrices of these dimensions on the left (right).
+                 trace_left_dim=0, trace_right_dim=0,
                  # arguments for manual input of lattice
                  lattice_type=None, lattice_parameter=None, lattice_angles=None,
                  input_coord_units=AO.position_units.ALAT, atomic_basis=None, perturbed_distances=None,
@@ -113,42 +117,16 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
     # set up output array
     entropy_out = np.empty(shape=times.shape)
 
-    # partial trace dimensions - left (right) trace corresponds to tracing over the components which correspond to the
-    # density matrix kronecker product-ed with matrices of these dimensions on the left (right).
-    trace_left_dim = 1024
-    trace_right_dim = 0
-
     # file open and preamble (if applicable)
     output_file = None
     if output_file_location is not None:
         # open the output file in write mode
         output_file = open(output_file_location, 'w')
 
-        # program name, date and time completed
-        output_file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
-                               '\n!\n')
-
-        # get the git version
-        version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
-        output_file.writelines('! Using version ' + str(version_label) + '\n!\n')
-
-        # type of calculation
-        output_file.writelines('! Entropy time calculation completed between t=' + str(times[0]) + ' and ' +
-                               str(times[-1]) + ' with a timestep of ' + str(times[1]-times[0]) + ' microseconds' +
-                               '\n!\n')
-
-        output_file.writelines('! Muon initial polarisation is in the direction (' + str(muon_polarisation.ortho_x) +
-                               ', ' + str(muon_polarisation.ortho_y) + ', ' + str(muon_polarisation.ortho_z) + ') \n ')
-
-        output_file.writelines('! Calculation done by partial traces of left dimension ' + str(trace_left_dim) + ' and '
-                               + 'right dimension ' + str(trace_right_dim) + '. \n')
-
-        # do atoms preamble
-        AO.atoms_file_preamble(output_file, muon_position, Spins, use_xtl_input, xtl_input_location, use_pw_output,
-                               pw_output_file_location, perturbed_distances, squish_radius, nnnness, exclusive_nnnness,
-                               lattice_type, lattice_parameter)
-
-        output_file.writelines('! time (microseconds)  von Neumann Entropy (units of log2)\n')
+        entropy_file_preamble(output_file, times, trace_left_dim, trace_right_dim, muon_polarisation, muon_position,
+                              Spins, use_xtl_input, xtl_input_location, use_pw_output, pw_output_file_location,
+                              perturbed_distances, squish_radius, nnnness, exclusive_nnnness, lattice_type,
+                              lattice_parameter, 1)
 
     for i_time in range(0, len(times)):
         # get the time
@@ -163,12 +141,12 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
 
         # do partial traces
         if trace_right_dim != 0:
-            if trace_right_dim <= 256:  # 256 found experimentally for 2028x2048 matrix
+            if trace_right_dim/density_matrix.shape[0] <= 0.125:  # 256 found experimentally for 2028x2048 matrix
                 density_matrix = traces(density_matrix, right_dim=trace_right_dim)
             else:
                 density_matrix = trace(density_matrix, right_dim=trace_right_dim)
         if trace_left_dim != 0:
-            if trace_left_dim <= 256:  # 256 found experimentally for 2028x2048 matrix
+            if trace_left_dim/density_matrix.shape[0] <= 0.125:  # 256 found experimentally for 2028x2048 matrix
                 density_matrix = traces(density_matrix, left_dim=trace_left_dim)
             else:
                 density_matrix = trace(density_matrix, left_dim=trace_left_dim)
@@ -190,6 +168,39 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
     if plot:
         pyplot.plot(times, entropy_out, 'b')
         pyplot.show()
+
+
+def entropy_file_preamble(output_file, times, trace_left_dim, trace_right_dim, muon_polarisation, muon_position, Spins,
+                          use_xtl_input, xtl_input_location, use_pw_output, pw_output_file_location,
+                          perturbed_distances, squish_radius, nnnness, exclusive_nnnness, lattice_type,
+                          lattice_parameter, no_processors=1):
+
+    # program name, date and time completed
+    output_file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                           '\n!\n')
+
+    # get the git version
+    version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
+    output_file.writelines('! Using version ' + str(version_label) + ', running on' + str(no_processors) +
+                           ' cores' + '\n!\n')
+
+    # type of calculation
+    output_file.writelines('! Entropy time calculation completed between t=' + str(times[0]) + ' and ' +
+                           str(times[-1]) + ' with a timestep of ' + str(times[1] - times[0]) + ' microseconds' +
+                           '\n!\n')
+
+    output_file.writelines('! Muon initial polarisation is in the direction (' + str(muon_polarisation.ortho_x) +
+                           ', ' + str(muon_polarisation.ortho_y) + ', ' + str(muon_polarisation.ortho_z) + ') \n ')
+
+    output_file.writelines('! Calculation done by partial traces of left dimension ' + str(trace_left_dim) + ' and '
+                           + 'right dimension ' + str(trace_right_dim) + '. \n')
+
+    # do atoms preamble
+    AO.atoms_file_preamble(output_file, muon_position, Spins, use_xtl_input, xtl_input_location, use_pw_output,
+                           pw_output_file_location, perturbed_distances, squish_radius, nnnness, exclusive_nnnness,
+                           lattice_type, lattice_parameter)
+
+    output_file.writelines('! time (microseconds)  von Neumann Entropy (units of log2)\n')
 
 
 def trace(matrix, left_dim: int = 0, right_dim: int = 0):
