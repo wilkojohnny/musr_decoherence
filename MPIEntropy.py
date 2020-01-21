@@ -131,7 +131,7 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
         # print left and right traces
         print('Left trace dim: ' + str(trace_left_dim))
         print('Right trace dim: ' + str(trace_right_dim))
-        print('\n BEGIN ENTROPY (format is <core>: time)')
+        print('\n BEGIN ENTROPY (format is <core>: local time id)')
     else:
         # for all other cores, nontype them for now
         E = None
@@ -158,7 +158,6 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
         for i_time in range(0, len(times)):
             # get the time
             time = times[i_time]
-            print('<' + str(rank) + '>:' + str(time))
 
             # time evolve
             Ejt = E * 1j * time
@@ -210,6 +209,7 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
                 if time_i < times_sizes[core - 1]:
                     # if it does, then wait for the entropy, and put into array
                     entropy_outputs[core - 1][time_i] = MPI_comm.recv(source=core, tag=time_i)
+                    print('<' + str(core) + '>: time id ' + str(time_i))
 
         # when all done, collate entropy_out, and save into file
         entropy_output = np.empty(0)
