@@ -127,6 +127,11 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
             output_file.close()
         # steal a copy of times before core 1 messes it up...
         all_times = times
+
+        # print left and right traces
+        print('Left trace dim: ' + str(trace_left_dim))
+        print('Right trace dim: ' + str(trace_right_dim))
+        print('\n BEGIN ENTROPY (format is <core>: time)')
     else:
         # for all other cores, nontype them for now
         E = None
@@ -153,7 +158,7 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
         for i_time in range(0, len(times)):
             # get the time
             time = times[i_time]
-            #print('<' + str(rank) + '>:' + str(time))
+            print('<' + str(rank) + '>:' + str(time))
 
             # time evolve
             Ejt = E * 1j * time
