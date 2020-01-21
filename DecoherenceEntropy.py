@@ -10,6 +10,7 @@ import scipy.linalg as scilinalg  # stops this conflicting with numpy's linalg
 import numpy as np  # maths tools
 import matplotlib.pyplot as pyplot  # plottting
 import subprocess  # git version
+import os  # for getting the script location (so that git can run properly)
 from datetime import datetime  # for current date and time
 
 
@@ -180,9 +181,10 @@ def entropy_file_preamble(output_file, times, trace_left_dim, trace_right_dim, m
                            '\n!\n')
 
     # get the git version
-    version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    version_label = subprocess.check_output(["git", "describe", "--always"], cwd=script_dir).strip()
     output_file.writelines('! Using version ' + str(version_label) + ', running on' + str(no_processors) +
-                           ' cores' + '\n!\n')
+                           ' cores' + '\n!')
 
     # type of calculation
     output_file.writelines('! Entropy time calculation completed between t=' + str(times[0]) + ' and ' +
