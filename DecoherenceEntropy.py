@@ -56,16 +56,16 @@ def main():
 
     # define muon position
     muon_position = coord.TCoord3D(.25, 0.25, 0.5)
-    muon_polarisation = coord.TCoord3D(0, 0, 1)
+    muon_polarisation = coord.TCoord3D(0, 0, 0)
 
     # file name
-    output_file_name = 'sertest.dat'
+    output_file_name = 'Entropy/no_polarised/CaF2_nn_nnF_0_entropy.dat'
 
     calc_entropy(muon_position=muon_position, squish_radius=squish_radii, lattice_type=lattice_type,
                  lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                  muon_polarisation=muon_polarisation, input_coord_units=input_coord_units, atomic_basis=atomic_basis,
                  perturbed_distances=perturbed_distances, nnnness=2, ask_each_atom=False, times=np.arange(0, 25, 0.02),
-                 output_file_location=output_file_name, plot=False, trace_left_dim=0, trace_right_dim=4)
+                 output_file_location=output_file_name, plot=True, trace_left_dim=2, trace_right_dim=0)
 
     return 1
 
