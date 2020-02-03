@@ -153,12 +153,12 @@ def calc_entropy(muon_position, muon_polarisation: coord, squish_radius=None, ti
                 density_matrix = trace(density_matrix, left_dim=trace_left_dim)
 
         # do x*log(x)
-        entropy = -1*tr_xlogx(density_matrix)
+        entropy = -1*tr_xlogx(density_matrix)/np.log(2)
 
         # if there is a big imaginary part of the trace, something has gone wrong...
         assert entropy.imag < 1e-5
 
-        entropy_out[i_time] = entropy.real/np.log(2)
+        entropy_out[i_time] = entropy.real
 
         if output_file is not None:
             output_file.writelines(str(time) + '\t' + str(entropy.real) + '\n')

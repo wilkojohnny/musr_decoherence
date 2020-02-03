@@ -11,6 +11,7 @@ import TCoord3D as coord  # coordinate utilities
 import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 import matplotlib.pyplot as pyplot  # plotting
+import os  #
 
 
 # do decoherence file preamble
@@ -22,7 +23,8 @@ def decoherence_file_preamble(file, muon_position, nn_atoms, fourier, starttime=
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
     # get the git version
-    version_label = subprocess.check_output(["git", "describe", "--always"]).strip()
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    version_label = subprocess.check_output(["git", "describe", "--always"], cwd=script_dir).strip()
     file.writelines('! Using version ' + str(version_label) + '\n!\n')
 
     # type of calculation
@@ -414,14 +416,14 @@ def main():
     muon_position = coord.TCoord3D(.25, 0.25, 0.5)  # CaF2
 
     # define muon polarisation relative to the sample -- None for polycrystalline
-    muon_sample_polarisation = coord.TCoord3D(1, 0, 0)
+    muon_sample_polarisation = coord.TCoord3D(0, 0, 1)
 
     calc_decoherence(muon_position=muon_position, muon_sample_polarisation=muon_sample_polarisation,
                      squish_radius=squish_radii, lattice_type=lattice_type,
                      lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
                      input_coord_units=input_coord_units, atomic_basis=atomic_basis,
                      use_pw_output=False, pw_output_file_location=pw_output_file_location, no_atoms=no_atoms,
-                     perturbed_distances=perturbed_distances, plot=True, nnnness=2, ask_each_atom=False,
+                     perturbed_distances=perturbed_distances, plot=True, nnnness=3, ask_each_atom=False,
                      fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0, 25, 0.1), outfile_location=None)
     return 1
 
