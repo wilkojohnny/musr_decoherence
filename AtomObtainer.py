@@ -9,6 +9,7 @@ import numpy as np  # for numpy arrays
 from enum import Enum
 import copy
 
+
 # class to define the enumerations for the different types of lattices available - same as pw.x
 class ibrav(Enum):
     OTHER = 0  # lattice given by a b c alpha beta gamma
@@ -350,9 +351,9 @@ def get_spins(muon_position, squish_radius=None,
                      # arguments for XTL
                      use_xtl_input=False, xtl_input_location=None,
                      # arguments for XTL or manual input
-                     nnnness=2, exclusive_nnnness=False,
+                     nnnness=2, exclusive_nnnness=False, max_nn_search_radius=None,
                      # arguments for pw.x output
-                     use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False):
+                     use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False, shutup=False):
 
     atomic_basis = copy.deepcopy(atomic_basis)
 
@@ -470,7 +471,7 @@ def get_spins(muon_position, squish_radius=None,
 
         # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
         nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
-                               perturbed_distances, squish_radius)
+                               perturbed_distances, squish_radius, max_search_radius=max_nn_search_radius)
 
         # if ask_each_atom is True, ask the user if they want to include each individual atom
         if ask_each_atom:
@@ -487,8 +488,9 @@ def get_spins(muon_position, squish_radius=None,
                 atom(i_atom[1], i_atom[2].gyromag_ratio, i_atom[2].II, i_atom[2].name, i_atom[2].abundance))
 
     # print the atoms in the list
-    for i_atom in All_Spins:
-        print(i_atom)
+    if not shutup:
+        for i_atom in All_Spins:
+            print(i_atom)
 
     # turn the spins into a muon-centred basis
     for spin in All_Spins:
@@ -499,10 +501,11 @@ def get_spins(muon_position, squish_radius=None,
 
 
 # nnn finder
-def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, perturbations=None, squish_radii=None):
+def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, perturbations=None, squish_radii=None,
+               max_search_radius=None):
     # function which returns an array of TCoord3D of the nn etc
     # nn parameter: =2 for nn, 3 for nnn, 4 for nnnn...
-    # nn_pert_distance: distance of the nn bond, set to None if perturbing manually/not perturbing at all
+    # squish_radii: muon-nnatom doistancs, set to None if perturbing manually/not perturbing at all
 
     # sort out mutability
     if perturbations is None:
@@ -532,7 +535,15 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
         # for each term in exact_nml, look +-1 in each direction (floor+-(nn-1) will do for now)
         for i in range(0, len(exact_nml)):
             flr_nml = np.floor(exact_nml[i])
-            for nm_or_l in range(int(flr_nml) - (nn - 1), int(flr_nml) + (nn + 1)):
+            # if no max search radius is defined, make one up in a crude way
+            if max_search_radius is None:
+                lowest_nml = flr_nml - (nn - 1)
+                max_nml = flr_nml + (nn + 1)
+            else:
+                # use max search radius (also in a crude way!
+                lowest_nml = np.int(flr_nml - np.ceil(max_search_radius/muon_atom_position.r()))
+                max_nml = np.int(flr_nml + np.ceil(max_search_radius/muon_atom_position.r()))
+            for nm_or_l in range(lowest_nml, max_nml):
                 # is this in the list?
                 if nm_or_l not in nml_list[i]:
                     nml_list[i].append(nm_or_l)
@@ -559,23 +570,6 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
     # sort the list by radius
     nearestneighbours.sort(key=lambda atom: atom[0])
 
-    # find the closest two F atoms, and perturb by means of squisification
-    ## the below squishification code is crap - so rmed
-    # closest_F_radius = 0
-    # for atom in nearestneighbours:  # atom is [mu-atom distance, position, TDecoherenceAtom object]
-    #     if atom[2].name == 'F':
-    #         if closest_F_radius == 0:
-    #             closest_F_radius = atom[0]  # if no Fs have been registered yet, use this radius as the reference
-    #         elif (atom[0] - closest_F_radius) < 1e-3:
-    #             # this atom is also a nn
-    #             pass
-    #         else:
-    #             break
-    #         # if we get here, it means this atom needs squishification (if desired)
-    #         if squish_radius is not None:
-    #             atom[0] = squish_radius
-    #             atom[1].set_r(squish_radius, muon.position)
-    #             atom[2].position = atom[1]
 
     # sort the list by radius (just the beginning atoms might've changed)
     # nearestneighbours.sort(key=lambda atom: atom[0]) ## .. probably wrote this after a wine and cheese!!
