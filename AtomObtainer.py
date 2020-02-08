@@ -356,6 +356,7 @@ def get_spins(muon_position, squish_radius=None,
                      use_pw_output=False, pw_output_file_location=None, no_atoms=0, ask_each_atom=False, shutup=False):
 
     atomic_basis = copy.deepcopy(atomic_basis)
+    perturbed_distances = copy.deepcopy(perturbed_distances)
 
     # if told to use both pw and xtl, exit
     if use_pw_output and use_xtl_input:
