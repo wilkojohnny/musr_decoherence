@@ -537,9 +537,9 @@ def nnn_finder(basis, muon, lattice_translation, nn=2, exclusive_nnnness=False, 
         for i in range(0, len(exact_nml)):
             flr_nml = np.floor(exact_nml[i])
             # if no max search radius is defined, make one up in a crude way
-            if max_search_radius is None:
-                lowest_nml = flr_nml - (nn - 1)
-                max_nml = flr_nml + (nn + 1)
+            if max_search_radius is None or max_search_radius is False:
+                lowest_nml = np.int(flr_nml - (nn - 1))
+                max_nml = np.int(flr_nml + (nn + 1))
             else:
                 # use max search radius (also in a crude way!
                 lowest_nml = np.int(flr_nml - np.ceil(max_search_radius/muon_atom_position.r()))
