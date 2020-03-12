@@ -342,6 +342,7 @@ def ask_atom_info(question, no_responses=None, isInt=False):
                 if satisfactory_output:
                     return np.array(output)
 
+
 # from input data, generate a vector [..] of TDecoherenceAtoms which have positions in a muon-centred basis.
 # return muon, All_spins, success
 def get_spins(muon_position, squish_radius=None,
@@ -366,8 +367,7 @@ def get_spins(muon_position, squish_radius=None,
     # check that everything is in order: if not, then leave
     if not use_pw_output and not use_xtl_input:
         # should have manually entered all the details in
-        if lattice_type is None or lattice_parameter is None or lattice_angles is None or atomic_basis is None or \
-                perturbed_distances is None:
+        if atomic_basis is None:
             print('Not enough information given. Aborting...')
             return None, None, False
     elif use_pw_output:
@@ -387,7 +387,7 @@ def get_spins(muon_position, squish_radius=None,
             All_Spins.append(each_atom)
         muon_position = muon.position
     else:
-        if not use_xtl_input:
+        if not use_xtl_input and lattice_parameter is not None:
             # define a b, c, alpha, beta, gamma for clarity
             a = lattice_parameter[0]
             b = lattice_parameter[1]
@@ -464,15 +464,25 @@ def get_spins(muon_position, squish_radius=None,
 
             # create muon
             muon = atom(muon_position, gyromag_ratio=851.372, II=1, name='mu')
-        else:
+
+            # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
+            nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
+                                   perturbed_distances, squish_radius, max_search_radius=max_nn_search_radius)
+        elif use_xtl_input:
             # import the fractional coordinates from the XTL
             muon, atomic_basis, [a1, a2, a3] = get_atoms_from_xtl(xtl_file_location=xtl_input_location)
             lattice_type = ibrav.OTHER
             muon_position = muon.position
 
-        # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
-        nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
-                               perturbed_distances, squish_radius, max_search_radius=max_nn_search_radius)
+            # now what we want to do is calculate how many of these are nn, nnn, nnnn etc
+            nnn_atoms = nnn_finder(atomic_basis, muon, [a1, a2, a3], nnnness, exclusive_nnnness,
+                                   perturbed_distances, squish_radius, max_search_radius=max_nn_search_radius)
+        else:
+            # create muon
+            muon = atom(muon_position, gyromag_ratio=851.372, II=1, name='mu')
+            # just use the atomic basis (but convert into nnn_atom's format...)
+            nnn_atoms = [[(this_atom.position-muon.position).r(), this_atom.position, this_atom]
+                         for this_atom in atomic_basis]
 
         # if ask_each_atom is True, ask the user if they want to include each individual atom
         if ask_each_atom:

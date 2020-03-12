@@ -71,7 +71,7 @@ def inc_isotope_id(basis, oldids=None):
         return oldids
 
 
-def calc_decoherence(muon_position, muon_sample_polarisation=None, squish_radius=None, times=np.arange(0, 10, 0.1),
+def calc_decoherence(muon_position=None, muon_sample_polarisation=None, squish_radius=None, times=np.arange(0, 10, 0.1),
                      # arguments for manual input of lattice
                      lattice_type=None, lattice_parameter=None, lattice_angles=None,
                      input_coord_units=AtomObtainer.position_units.ALAT, atomic_basis=None, perturbed_distances=None,
@@ -121,7 +121,7 @@ def calc_decoherence(muon_position, muon_sample_polarisation=None, squish_radius
     muon, All_Spins, got_atoms = AtomObtainer.get_spins(muon_position, squish_radius, lattice_type, lattice_parameter,
                                                         lattice_angles, input_coord_units, atomic_basis,
                                                         perturbed_distances, use_xtl_input, xtl_input_location, nnnness,
-                                                        exclusive_nnnness, use_pw_output, pw_output_file_location,
+                                                        exclusive_nnnness, None, use_pw_output, pw_output_file_location,
                                                         no_atoms, ask_each_atom)
 
     # count number of spins
