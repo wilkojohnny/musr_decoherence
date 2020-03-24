@@ -650,7 +650,6 @@ def atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input=None, xtl_i
     file.writelines('! Calculated by looking at ')
     for i in range(0, nnnness):
         file.writelines('n')
-
     file.writelines(' interactions \n! \n')
 
     if exclusive_nnnness == True and not use_pw_output:

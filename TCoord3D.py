@@ -10,7 +10,7 @@
 # to be consistent with the literature and quantum espresso...)
 
 import math
-
+import numpy as np
 
 class TCoord3D:
 

@@ -4,6 +4,7 @@ import TCoord3D as coord  # 3D coordinates class
 import numpy as np  # for matrices
 import scipy.sparse as sparse  # for sparse matrices
 
+
 # make measurement operator for this spin
 def measure_ith_spin(Spins, i, pauli_matrix):
     # calculate the dimension of the identity matrix on the LHS ...

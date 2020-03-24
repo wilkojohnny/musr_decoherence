@@ -26,7 +26,7 @@ def fit(data_file_location: str, fit_function, initial_params: list, plot: bool,
     print("\n")
 
     # calculate the fit function one last time
-    fit_func = fit_function(x, params[0], params[1], params[2], params[3], params[4])
+    fit_func = fit_function(x, params[0], params[1], params[2], params[3])
     # find the chi squared
     chi_squared = (((fit_func - y)/y_error)**2).sum()
     chi_squared_dof = chi_squared/(len(y) - len(params))

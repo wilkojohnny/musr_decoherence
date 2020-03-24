@@ -10,7 +10,17 @@ import TCoord3D # for position
 
 class TDecoherenceAtom:
 
-    def __init__(self, position: TCoord3D, gyromag_ratio, II, name='atom', abundance=1.):
+    def __init__(self, position: TCoord3D, name: str, gyromag_ratio=None, II=None, abundance=1.):
+
+        # if only name is defined, then get the numbers from the database
+        if gyromag_ratio is None or II is None:
+            try:
+                gyromag_ratio = nucleon_properties[name]['gyromag_ratio']
+                II = nucleon_properties[name]['II']
+                abundance = nucleon_properties[name]['abundance']
+            except KeyError:
+                print('WARNING -- Atom ' + name + ' is not in the database. The magnetic properties will be ignored.')
+
         # we require the nuclear spin to create the Pauli matrices, and also the magnetic moment
         # (II = 2*spin, to prevent floating point problems)
         self.II = II
@@ -100,3 +110,27 @@ class TDecoherenceAtom:
             outstring.append(linestart + '\t Gyromagnetic ratio (*2pi): ' + str(self.gyromag_ratio) + ' \n')
 
         return outstring
+
+
+# dictionary for nuclei. Append as and when more are needed.
+# Numbers from https://web.archive.org/web/20180305085231/http://www.kayelaby.npl.co.uk/chemistry/3_8/3_8_1.html
+nucleon_properties = {
+    "mu": {"II": 1,
+           "gyromag_ratio": 851.372,
+           "abundance": 1},
+    "Li": {"II": np.array([2, 3]),
+           "gyromag_ratio": np.array([6.2655, 16.5465])*2*3.4145926,
+           "abundance": np.array([0.0742, 0.9258])
+           },
+    "F": {"II": 1,
+          "gyromag_ratio": 251.713,
+          "abundance": 1
+          },
+    "Na": {"II": 3,
+           "gyromag_ratio": 70.76186,
+           "abundance": 1
+           },
+    "Y": {"II": 1,
+          "gyromag_ratio": 13.1067,
+          "abundance": 1}
+}

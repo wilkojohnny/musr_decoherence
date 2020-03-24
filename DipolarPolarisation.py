@@ -15,10 +15,8 @@ import os  #
 
 
 # do decoherence file preamble
-def decoherence_file_preamble(file, muon_position, nn_atoms, fourier, starttime=None, endtime=None, timestep=None,
-                              fourier_2d=None, tol=None, use_xtl_input=None, xtl_input_location=None,
-                              use_pw_output=None, pw_output_location=None, perturbed_distances=None, squish_radius=None,
-                              nnnness=None, exclusive_nnnness=None, lattice_type=None, lattice_parameter=None):
+def decoherence_file_preamble(file, nn_atoms, muon, fourier, starttime=None, endtime=None, timestep=None,
+                              fourier_2d=None, tol=None):
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
@@ -39,9 +37,13 @@ def decoherence_file_preamble(file, muon_position, nn_atoms, fourier, starttime=
         file.writelines('! absolute tolerance between eigenvalues to treat them as equivalent was ' + str(tol)
                         + '\n!\n')
 
-    AtomObtainer.atoms_file_preamble(file, muon_position, nn_atoms, use_xtl_input, xtl_input_location, use_pw_output,
-                                     pw_output_location, perturbed_distances, squish_radius, nnnness, exclusive_nnnness,
-                                     lattice_type, lattice_parameter)
+    file.writelines('! Muon position: ' + str(muon.position) + '\n')
+
+    for atom in nn_atoms:
+        lines_to_write = atom.verbose_description(gle_friendly=True)
+        for line in lines_to_write:
+            file.writelines(line)
+    file.writelines('!\n')
 
     file.writelines('! start of data: \n')
 
@@ -71,71 +73,43 @@ def inc_isotope_id(basis, oldids=None):
         return oldids
 
 
-def calc_decoherence(muon_position=None, muon_sample_polarisation=None, squish_radius=None, times=np.arange(0, 10, 0.1),
-                     # arguments for manual input of lattice
-                     lattice_type=None, lattice_parameter=None, lattice_angles=None,
-                     input_coord_units=AtomObtainer.position_units.ALAT, atomic_basis=None, perturbed_distances=None,
-                     # arguments for XTL
-                     use_xtl_input=False, xtl_input_location=None,
-                     # arguments for XTL or manual input
-                     nnnness=2, exclusive_nnnness=False,
-                     # arguments for pw.x output
-                     use_pw_output=False, pw_output_file_location=None, no_atoms=0,
+def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
+                     times: np.ndarray = np.arange(0, 10, 0.1),
                      # other arguments
-                     fourier=False, fourier_2d=False, outfile_location=None, tol=1e-10, plot=False, shutup=False,
-                     ask_each_atom=False):
+                     fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
+                     plot: bool = False, shutup: bool =False):
     '''
-    Calculate the time- or frequency- dependent muon polarisation function.
-    :param muon_position: Muon position
-    :param muon_sample_polarisation: Polarisation of the muon wrt the sample: None for polycrystalline sample
-    :param squish_radius: [] radius to which the [nn, nnn, nnnn,...] atoms are perturbed to
-    :param times: times in \mu s to calculate the polarisation function for
-    :param lattice_type: lattice type number, following Espresso pw.x's convention
-    :param lattice_parameter: [a, b, c] lattice parameter in Angstroms
-    :param lattice_angles: [alpha, beta, gamma] in degrees
-    :param input_coord_units: following QE convention
-    :param atomic_basis: basis of atoms to be repeated in the cell through translations
-    :param perturbed_distances: in format [[old position, new position], [old position, new position]].
-                                Better to use squish_radius
-    :param use_xtl_input: whether use XTL input file
-    :param xtl_input_location: location of XTL input file, if being used
-    :param nnnness: maximum next-nerarest neighbour-ness to calculate to (nn=2, nnn=3, etc)
-    :param exclusive_nnnness: only calculate for the nnnness in nnnness, ignore nuclei before
-    :param use_pw_output: use Espresso pw.x output file
-    :param pw_output_file_location: location of pw.x output file
-    :param no_atoms: number of atoms to use in pw.x output file (nnnness is not quite so elegant here)
-    :param fourier: calculate frequency-dependent plot
-    :param fourier_2d: calculate energies and transitions between them
-    :param outfile_location: location of the file for the output to be saved to
-    :param tol: difference between frequencies to be treated the same
-    :param plot: Draw the plot
-    :param shutup: True for very little verbosity
-    :param ask_each_atom: ask the user for every atom if they want it included in the calculation
-    :return: value of the muon polarisation function (in time, frequency or freq1, freq 2 depending on input)
+    :param all_spins: array of the spins
+    :param muon:
+    :param muon_sample_polarisation:
+    :param times:
+    :param fourier:
+    :param fourier_2d:
+    :param outfile_location:
+    :param tol:
+    :param plot:
+    :param shutup:
+    :return:
     '''
+
+    for atom in all_spins:
+        print(atom)
 
     # type of calculation - can't do fourier2d if not fourier
     fourier_2d = fourier_2d and fourier
 
-    # get the atoms and the muon
-    muon, All_Spins, got_atoms = AtomObtainer.get_spins(muon_position, squish_radius, lattice_type, lattice_parameter,
-                                                        lattice_angles, input_coord_units, atomic_basis,
-                                                        perturbed_distances, use_xtl_input, xtl_input_location, nnnness,
-                                                        exclusive_nnnness, None, use_pw_output, pw_output_file_location,
-                                                        no_atoms, ask_each_atom)
-
     # count number of spins
-    N_spins = len(All_Spins) - 1
+    N_spins = len(all_spins) - 1
 
     # count the number of combinations of isotopes
     isotope_combinations = 1
-    for atoms in All_Spins:
+    for atoms in all_spins:
         isotope_combinations = isotope_combinations * len(atoms)
     if not shutup:
         print(str(isotope_combinations) + ' isotope combination(s) found')
 
     # put all these number of isotopes into an array
-    number_isotopes = [len(atom) for atom in All_Spins]
+    number_isotopes = [len(atom) for atom in all_spins]
 
     current_isotope_ids = inc_isotope_id(basis=number_isotopes)
 
@@ -147,9 +121,9 @@ def calc_decoherence(muon_position=None, muon_sample_polarisation=None, squish_r
         # put this combination of isotopes into an array (Spins), and calculate probability of this state
         probability = 1.
         Spins = []
-        for atomid in range(0, len(All_Spins)):
-            Spins.append(All_Spins[atomid][current_isotope_ids[atomid]])
-            probability = probability * All_Spins[atomid][current_isotope_ids[atomid]].abundance
+        for atomid in range(0, len(all_spins)):
+            Spins.append(all_spins[atomid][current_isotope_ids[atomid]])
+            probability = probability * all_spins[atomid][current_isotope_ids[atomid]].abundance
 
         # create measurement operators for the muon's spin
         muon_spin_x = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
@@ -302,13 +276,8 @@ def calc_decoherence(muon_position=None, muon_sample_polarisation=None, squish_r
         if outfile_location is not None:
             outfile = open(outfile_location, "w")
             # do preamble
-            decoherence_file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
-                                      fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
-                                      xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
-                                      perturbed_distances=perturbed_distances, squish_radius=squish_radius, nnnness=nnnness,
-                                      exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
-                                      lattice_parameter=lattice_parameter, pw_output_location=pw_output_file_location)
-
+            decoherence_file_preamble(file=outfile, nn_atoms=all_spins, muon=muon, fourier=fourier,
+                                      fourier_2d=fourier_2d, tol=tol)
             if fourier_2d:
                 outfile.writelines('! frequency1 frequency2 amplitude \n')
                 outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0])
@@ -336,13 +305,8 @@ def calc_decoherence(muon_position=None, muon_sample_polarisation=None, squish_r
             # dump results in a file if requested
             outfile = open(outfile_location, "w")
             # do preamble
-            decoherence_file_preamble(file=outfile, muon_position=muon_position, nn_atoms=All_Spins, fourier=fourier,
-                                      fourier_2d=fourier_2d, tol=tol, use_xtl_input=use_xtl_input,
-                                      xtl_input_location=xtl_input_location, use_pw_output=use_pw_output,
-                                      pw_output_location=pw_output_file_location,
-                                      perturbed_distances=perturbed_distances, squish_radius=squish_radius,
-                                      nnnness=nnnness, exclusive_nnnness=exclusive_nnnness, lattice_type=lattice_type,
-                                      lattice_parameter=lattice_parameter, starttime=times[0], endtime=times[-1],
+            decoherence_file_preamble(file=outfile, nn_atoms=all_spins, muon=muon, fourier=fourier,
+                                      fourier_2d=fourier_2d, tol=tol, starttime=times[0], endtime=times[-1],
                                       timestep=times[1] - times[0])
             outfile.writelines('! t P_average \n')
             write_to_file(outfile, times, P_average)
@@ -357,76 +321,3 @@ def calc_decoherence(muon_position=None, muon_sample_polarisation=None, squish_r
             pyplot.show()
 
         return np.array(P_average)
-
-
-def main():
-    #### INPUT ####
-
-    # ## IF WE'RE USING PW_OUTPUT
-    pw_output_file_location = None
-    no_atoms = 10  # excludes muon
-
-    ## IF WE'RE USING AN XTL (crystal fractional coordinates) FILE
-    # xtl_input_location = 'CaF2_final_structure_reduced.xtl'
-    # (don't forget to define nnnness!)
-
-    # CaF2:
-    squish_radii = [1.172211, None]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
-
-    # KPF6:
-    # squish_radii = [None, None]  # radius of the nn F-mu bond after squishification (1.18 standard, None for no squishification)
-
-    ## IF WE'RE NOT USING pw output:
-    # nn, nnn, nnnn?
-    nnnness = 2  # 2 = nn, 3 = nnn etc
-    # exclusive_nnnness - if TRUE, then only calculate nnnness's interactions (and ignore the 2<=i<nnnness interactions)
-    #   exclusive_nnnness = False
-
-    ## IF NOT PW NOR XTL:
-    # lattice type: https://www.quantum-espresso.org/Doc/INPUT_PW.html#idm45922794628048
-    # CaF2:
-    lattice_type = AtomObtainer.ibrav.CUBIC_FCC  # # can only do fcc and monoclinic (unique axis b)
-    # lattice parameters and angles, in angstroms
-    lattice_parameter = [5.44542, 0, 0]  # [a, b, c]
-    lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
-
-    # KPF6:
-    # lattice_type = AtomObtainer.ibrav.CUBIC_SC  # # can only do sc, fcc and monoclinic (unique axis b)
-    # lattice parameters and angles, in angstroms
-    # lattice_parameter = [10, 0, 0]  # [a, b, c]
-    # lattice_angles = [90, 0, 0]  # [alpha, beta, gamma] in **degrees**
-
-    # are atomic coordinates provided in terms of alat or in terms of the primitive lattice vectors?
-    input_coord_units = AtomObtainer.position_units.ALAT
-
-    # atoms and unit cell: dump only the basis vectors in here, the rest is calculated
-    atomic_basis = [
-        # CaF2:
-        # atom(coord.TCoord3D(0, 0, 0), gyromag_ratio=np.array([18.0038, 0]), II=np.array([7, 0]), name='Ca',
-        #     abundance=np.array([0.00145, 0.99855])),
-        atom(coord.TCoord3D(0.25, 0.25, 0.25), gyromag_ratio=251.713, II=1, name='F'),
-        atom(coord.TCoord3D(0.25, 0.25, 0.75), gyromag_ratio=251.713, II=1, name='F')
-
-    ]
-
-    # register the perturbed distances
-    perturbed_distances = []
-
-    # define muon position
-    muon_position = coord.TCoord3D(.25, 0.25, 0.5)  # CaF2
-
-    # define muon polarisation relative to the sample -- None for polycrystalline
-    muon_sample_polarisation = coord.TCoord3D(0, 0, 1)
-
-    calc_decoherence(muon_position=muon_position, muon_sample_polarisation=muon_sample_polarisation,
-                     squish_radius=squish_radii, lattice_type=lattice_type,
-                     lattice_parameter=lattice_parameter, lattice_angles=lattice_angles,
-                     input_coord_units=input_coord_units, atomic_basis=atomic_basis,
-                     use_pw_output=False, pw_output_file_location=pw_output_file_location, no_atoms=no_atoms,
-                     perturbed_distances=perturbed_distances, plot=True, nnnness=3, ask_each_atom=False,
-                     fourier=False, fourier_2d=False, tol=1e-3, times=np.arange(0, 25, 0.1), outfile_location=None)
-    return 1
-
-
-if __name__=='__main__':
-    main()
