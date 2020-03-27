@@ -6,7 +6,6 @@ from scipy import optimize  # for nls curve fitting
 import matplotlib.pyplot as pyplot  # for plotting
 import matplotlib.colors as color
 
-
 def fit(data_file_location: str, fit_function, initial_params: list, plot: bool, end_time=None):
     """
     :param data_file_location: location of the muon data file
@@ -38,7 +37,7 @@ def fit(data_file_location: str, fit_function, initial_params: list, plot: bool,
     if plot:
         pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
         pyplot.plot(x, fit_func, color=color.cnames['black'])
-        pyplot.ylim((0, 30))
+        pyplot.ylim((-10, 30))
         pyplot.show()
 
 

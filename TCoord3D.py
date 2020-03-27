@@ -12,6 +12,7 @@
 import math
 import numpy as np
 
+
 class TCoord3D:
 
     def __init__(self, x: float = 0, y: float = 0, z: float = 0, basis=None):
@@ -80,6 +81,9 @@ class TCoord3D:
     def toarray(self):
         return [self.ortho_x, self.ortho_y, self.ortho_z]
 
+    def tonumpyarray(self):
+        return np.array(self.toarray())
+
     # set r to be a predefined value, squashing this vector to make this happen
     def set_r(self, r, other=None):
         r_vector = self
@@ -101,6 +105,9 @@ class TCoord3D:
     # get r
     def r(self):
         return math.sqrt(self * self)
+
+    def rhat(self):
+        return self / self.r()
 
     # define operators
     def __sub__(self, other):
@@ -149,6 +156,28 @@ class TCoord3D:
             return True
         else:
             return False
+
+    def __index__(self, index):
+        if isinstance(index, int):
+            if index == 0 or index == -1:
+                return self.ortho_x
+            elif index == 1:
+                return self.ortho_y
+            elif index == 2:
+                return self.ortho_z
+            else:
+                return NotImplemented
+        elif isinstance(index, str):
+            if index == 'x':
+                return self.ortho_x
+            elif index == 'y':
+                return self.ortho_y
+            elif index == 'z':
+                return self.ortho_z
+            else:
+                return NotImplemented
+        else:
+            return NotImplemented
 
 
 cartesian_basis = [TCoord3D(1, 0, 0), TCoord3D(0, 1, 0), TCoord3D(0, 0, 1)]

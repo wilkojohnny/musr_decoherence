@@ -59,7 +59,8 @@ class TDecoherenceAtom:
     def duplicate(self, new_position=None):
         if new_position is None:
             new_position = self.position
-        return TDecoherenceAtom(new_position, self.gyromag_ratio, self.II, self.name, self.abundance)
+        return TDecoherenceAtom(position=new_position, gyromag_ratio=self.gyromag_ratio, II=self.II, name=self.name,
+                                abundance=self.abundance)
 
     def __str__(self):
         return self.name + ' at ' + str(self.position) + ' (with ' + str(len(self)) + ' isotope(s))'
