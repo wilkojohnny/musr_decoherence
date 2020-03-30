@@ -20,6 +20,8 @@ class TDecoherenceAtom:
                 abundance = nucleon_properties[name]['abundance']
             except KeyError:
                 print('WARNING -- Atom ' + name + ' is not in the database. The magnetic properties will be ignored.')
+                II = 0
+                gyromag_ratio = 0
 
         # we require the nuclear spin to create the Pauli matrices, and also the magnetic moment
         # (II = 2*spin, to prevent floating point problems)
@@ -130,8 +132,5 @@ nucleon_properties = {
     "Na": {"II": 3,
            "gyromag_ratio": 70.76186,
            "abundance": 1
-           },
-    "Y": {"II": 1,
-          "gyromag_ratio": 13.1067,
-          "abundance": 1}
+           }
 }

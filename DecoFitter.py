@@ -2,36 +2,30 @@
 
 # load modules
 import numpy as np  # for numpy arrays
-from scipy import optimize  # for nls curve fitting
 import matplotlib.pyplot as pyplot  # for plotting
-import matplotlib.colors as color
+import matplotlib.colors as color  # for colourful plots
+from lmfit import minimize, parameter  # for nls curve fitting
 
-def fit(data_file_location: str, fit_function, initial_params: list, plot: bool, end_time=None):
+
+def fit(data_file_location: str, fit_function, params: parameter, plot: bool, end_time=None):
     """
     :param data_file_location: location of the muon data file
     :param fit_function: function to be fitted
-    :param initial_params: initial parameters in array
+    :param params: fit parameters
     :param plot: True == do a plot of the result
-    :return: params, chi squared per dof
+    :param end_time: cutoff time for fitting
+    :return: lmfit.parameter object of the fit result
     """
     # load in the data (expect it of the form x y yerr)
     x, y, y_error = load_muon_data(data_file_location, end_time=end_time)
 
-    params, covariances = optimize.curve_fit(fit_function, xdata=x, ydata=y, p0=initial_params, sigma=y_error)
-    params_errors = np.sqrt(np.diag(covariances))
+    fit_result = minimize(residual, params, args=(fit_function, x, y, y_error))
 
-    for i in range(0, len(params)):
-        print(str(params[i]) + "\t" + str(params_errors[i]) + "\t", end='')
-    print("\n")
+    print(fit_result.message)
+    fit_result.params.pretty_print()
 
     # calculate the fit function one last time
-    fit_func = fit_function(x, params[0], params[1], params[2], params[3])
-    # find the chi squared
-    chi_squared = (((fit_func - y)/y_error)**2).sum()
-    chi_squared_dof = chi_squared/(len(y) - len(params))
-
-    # print out the chi squared
-    print('Chi-squared: ' + str(chi_squared) + ' (' + str(chi_squared_dof) + ' per dof)')
+    fit_func = fit_function(fit_result.params, x)
 
     # plot the data
     if plot:
@@ -39,6 +33,20 @@ def fit(data_file_location: str, fit_function, initial_params: list, plot: bool,
         pyplot.plot(x, fit_func, color=color.cnames['black'])
         pyplot.ylim((-10, 30))
         pyplot.show()
+
+
+def residual(params, fit_function, x, y, yerr):
+    """
+    Calculates the residuals of the fit function
+    :param params: parameter object of the fitting parameters
+    :param fit_function: function to be fitted
+    :param x: xdata
+    :param y: ydata
+    :param yerr: error(ydata)
+    :return: residual of fit_function's description of y
+    """
+    y_func = fit_function(params, x)
+    return (y - y_func) / yerr
 
 
 def load_muon_data(filename: str, end_time=None, encoding='iso-8859-1'):

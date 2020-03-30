@@ -126,11 +126,26 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
     # make a supercell
     supercell = build.make_supercell(atoms_mu, np.diag([supercell_size, supercell_size, supercell_size]))
 
-    # find the most central muon -- this will be in the average position of all of them
+    # find the most central muon -- this will be in the average position of all of them. Also keep track of H atoms, as
+    # sometimes DFT uses H instead of mu. H atoms have -ve positions -- so if the array has only negative entries,
+    # make them all positive and continue. If there is one +ve entry, scrap the negative entries.
     supercell_muon_indexes = []
     for i_supercell_at in range(0, len(supercell)):
         if supercell[i_supercell_at].symbol == 'mu':
             supercell_muon_indexes.append(i_supercell_at)
+        elif supercell[i_supercell_at].symbol == 'H':
+            supercell_muon_indexes.append(-1 * i_supercell_at)
+
+    if max(supercell_muon_indexes) < 0:
+        # this means there is no mu, only H -- so make these muons
+        muon_symbol = 'H'
+        supercell_muon_indexes = [-1 * index for index in supercell_muon_indexes]
+    else:
+        muon_symbol = 'mu'
+        # get rid of the H indexes -- we have a muon!
+        for index in supercell_muon_indexes:
+            if index < 0:
+                del index
 
     muon_pos_x = 0
     muon_pos_y = 0
@@ -147,7 +162,7 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
 
     # remove all the muons
     for atom in supercell:
-        if atom.symbol != 'mu':
+        if atom.symbol != muon_symbol:
             supercell_onemuon.append(atom)
 
     del supercell
@@ -199,7 +214,7 @@ def aseatoms_to_tdecoatoms(atoms: Atoms, muon_array_id: int = 0, muon_centred_co
     """
     Converts ASE Atoms into an array of TDecoerenceAtom objects
     :param atoms: ASE atoms
-    :param muon_array_id: id of the muon location in the
+    :param muon_array_id: id of the muon location in atoms
     :param muon_centred_coords: centre coordinates on the muon
     :return: muon, list of TDecoherenceAtoms (with muon in position 0)
     """

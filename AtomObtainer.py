@@ -1,6 +1,7 @@
 # AtomObtainer.py - obtain the atoms required for DecoherenceCalculator
 # Only currently implemented for QE files, but may be extended to other files, etc in the future (we'll see...)
 # 14/4/19 - Extended for xtl files (these can be exported from CIF files with VESTA.)
+# 30/3/20 - DEPRECIATED -- use AtomObtainerN.py instead of this from now on
 
 from MDecoherenceAtom import TDecoherenceAtom as atom  # import class for decoherence atom
 import TCoord3D as coord  # 3D coordinates class
