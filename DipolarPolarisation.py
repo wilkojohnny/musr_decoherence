@@ -6,7 +6,7 @@ import subprocess  # gets git version
 from datetime import datetime  # allows one to print out date and time
 import DecoherenceCalculator as decoCalc  # allows one to calculate decoherence
 from MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
-import AtomObtainer  # allows one to play with atoms
+import time as human_time
 import TCoord3D as coord  # coordinate utilities
 import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
@@ -92,8 +92,9 @@ def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coor
     :return:
     '''
 
-    for atom in all_spins:
-        print(atom)
+    if not shutup:
+        for atom in all_spins:
+            print(atom)
 
     # type of calculation - can't do fourier2d if not fourier
     fourier_2d = fourier_2d and fourier
@@ -129,6 +130,8 @@ def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coor
         muon_spin_x = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
         muon_spin_y = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
         muon_spin_z = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
+
+        start_time = human_time.time()
 
         # calculate hamiltonian
         hamiltonian = decoCalc.calc_dipolar_hamiltonian(Spins)
@@ -300,6 +303,9 @@ def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coor
                 print("t=" + str(time))
             P_average.append(decoCalc.calc_p_average_t(time, const, amplitude, E).max())
             # print(P_average[-1])
+
+        if not shutup:
+            print("elapsed time: " + str(human_time.time() - start_time))
 
         if outfile_location is not None:
             # dump results in a file if requested

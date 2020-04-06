@@ -204,7 +204,7 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
             current_nnnness = nnnness_atoms[i_nearest_neighbour]
             this_squish = squish_radii[current_nnnness - 2]
             # if the squish radius is defined, and this squish is not bigger than the nnnness beyond that asked for
-            if this_squish is not None and this_squish <= max_squish_radius:
+            if this_squish is not None:  # and this_squish <= max_squish_radius: removed -- why not have things bigger?!
                 nearest_neighbour_atoms.set_distance(0, i_nearest_neighbour, squish_radii[current_nnnness - 2], 0)
 
     return nearest_neighbour_atoms

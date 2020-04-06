@@ -5,7 +5,10 @@
 
 import scipy.sparse as spmat  # for sparse matrices
 import numpy as np  # for sqrt
-import TCoord3D # for position
+import TCoord3D  # for position
+from ase import atom, atoms  # to convert these to ASE atoms
+from ase.gui.gui import GUI  # for the ASE gui
+from ase.gui.images import Images  # to make the atoms GUI-able
 
 
 class TDecoherenceAtom:
@@ -114,6 +117,28 @@ class TDecoherenceAtom:
 
         return outstring
 
+    def toASEatom(self) -> atom.Atom:
+        return atom.Atom(symbol=self.name, position=self.position.totuple())
+
+
+def visualise_atoms(input_atoms: list):
+    """
+    visualises the TDecoherenceAtoms using ASE
+    :param atoms: list of TDecoherenceAtoms to visualise
+    :return: 0
+    """
+
+    ase_atoms = atoms.Atoms()
+
+    # convert all the atoms into the ASE format
+    [ase_atoms.append(input_atom.toASEatom()) for input_atom in input_atoms]
+
+    images = Images()
+    images.initialize([ase_atoms])
+    gui = GUI(images)
+    gui.run()
+
+    return 0
 
 # dictionary for nuclei. Append as and when more are needed.
 # Numbers from https://web.archive.org/web/20180305085231/http://www.kayelaby.npl.co.uk/chemistry/3_8/3_8_1.html
@@ -132,5 +157,9 @@ nucleon_properties = {
     "Na": {"II": 3,
            "gyromag_ratio": 70.76186,
            "abundance": 1
-           }
+           },
+    "Y": {"II": 1,
+          "gyromag_ratio": 13.1067,
+          "abundance": 1
+    }
 }

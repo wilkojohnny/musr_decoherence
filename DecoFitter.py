@@ -4,7 +4,7 @@
 import numpy as np  # for numpy arrays
 import matplotlib.pyplot as pyplot  # for plotting
 import matplotlib.colors as color  # for colourful plots
-from lmfit import minimize, parameter  # for nls curve fitting
+from lmfit import minimize, parameter, fit_report  # for nls curve fitting
 
 
 def fit(data_file_location: str, fit_function, params: parameter, plot: bool, end_time=None):
@@ -19,10 +19,10 @@ def fit(data_file_location: str, fit_function, params: parameter, plot: bool, en
     # load in the data (expect it of the form x y yerr)
     x, y, y_error = load_muon_data(data_file_location, end_time=end_time)
 
-    fit_result = minimize(residual, params, args=(fit_function, x, y, y_error))
+    fit_result = minimize(residual, params, args=(fit_function, x, y, y_error), iter_cb=print_iteration)
 
     print(fit_result.message)
-    fit_result.params.pretty_print()
+    print(fit_report(fit_result))
 
     # calculate the fit function one last time
     fit_func = fit_function(fit_result.params, x)
@@ -33,6 +33,15 @@ def fit(data_file_location: str, fit_function, params: parameter, plot: bool, en
         pyplot.plot(x, fit_func, color=color.cnames['black'])
         pyplot.ylim((-10, 30))
         pyplot.show()
+
+    return fit_result.params
+
+
+def print_iteration(params, iter, residuals, *args, **kwargs):
+    # this function is run at every iteration of the fit
+    print('Iteration ' + str(iter))
+    print(params.pretty_print())
+    return False
 
 
 def residual(params, fit_function, x, y, yerr):
