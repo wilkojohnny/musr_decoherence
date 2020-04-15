@@ -34,7 +34,7 @@ def main():
     params = Parameters()
     params.add('A', value=26)
     params.add('r_nn', value=1.241, min=1, max=2)
-    params.add('r_nnn', value=1.616, min=1.5, max=2.5)
+    params.add('lambda_squish', value=0.9, min=0.5, max=1)
     params.add('A0', value=-1, min=-5, max=5)
 
     # try to do a fit
@@ -45,13 +45,13 @@ def fit_function(params, x):
 
     A = params['A']
     r_nn = params['r_nn']
-    r_nnnn = params['r_nnn']
+    lambda_squish = params['lambda_squish']
     A0 = params['A0']
 
-    squish_radii = [r_nn, None, r_nnnn]
+    squish_radii = [r_nn, None]
 
     muon, All_spins = AO.get_linear_fmuf_atoms(ase_atoms=CaF2_atoms, muon_position=muon_position,
-                                               nnnness=4, squish_radii=squish_radii)
+                                               nnnness=4, squish_radii=squish_radii, lambda_squish=lambda_squish)
 
     deco = DipolarPolarisation.calc_decoherence(all_spins=All_spins, muon=muon, muon_sample_polarisation=None, times=x,
                                                   plot=False, shutup=True)

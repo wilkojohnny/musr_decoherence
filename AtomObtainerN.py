@@ -16,13 +16,17 @@ import math
 
 
 def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: int = 2, squish_radii: list = None,
-                          enforce_nn_dist: float = 0, enforced_nn_indices: list = None) -> (Matom, list):
+                          lambda_squish: float = 1, enforce_nn_dist: float = 0, enforced_nn_indices: list = None)\
+        -> (Matom, list):
     """
     Get the TDecoAtoms muon, All_Spins in a *linear* F--mu--F state for these calculations
     :param ase_atoms: ASE atoms of the structure (without muon)
     :param muon_position: cartesian position of muon (in numpy array [x,y,z])
     :param nnnness: nnnness of the calculation
     :param squish_radii: list of perturbations to the structure for [nn, nnn, nnnn, ...]
+    :param lambda_squish: (see https://arxiv.org/abs/2003.02762), the factor to perturb all the nns above what is
+                           defined in squish_radii by. >1 is *not really* physical, but not impossible (as this
+                           takes into account both physical nuclear movements *and* decoherence 'movements')
     :param enforce_nn_dist: perturbs the selected two atoms which define the muon location
     :param enforced_nn_indices: indices of the two atoms to perturb before nnnness
     :return: TDecoherenceAtom Muon, list[TDecoAtom] All_spins (including muon in pos 0)
@@ -32,14 +36,15 @@ def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: 
     muon_aseatoms = add_muon_to_aseatoms(ase_atoms, muon_position, enforced_nn_indices, enforce_nn_dist)
 
     # find the nnnness atoms, and squishification
-    nnn_aseatoms = ase_nnnfinder(muon_aseatoms, nnnness, squish_radii, 5)
+    nnn_aseatoms = ase_nnnfinder(atoms_mu=muon_aseatoms, nnnness=nnnness, squish_radii=squish_radii,
+                                 lambda_squish=lambda_squish, supercell_size=5)
 
     # return muon, All_Spins
     return aseatoms_to_tdecoatoms(nnn_aseatoms)
 
 
 def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180,
-                        swing_angle: float = 0, nnnness: int = 2, squish_radii: list = None):
+                        swing_angle: float = 0, nnnness: int = 2, squish_radii: list = None, lambda_squish: float = 1):
     """
     Get F--mu--F atom + nnnness environment for a bent F--mu--F bond (see pg 123 lab book 2)
     :param ase_atoms: ASE atoms of the structure, without the muon
@@ -50,6 +55,9 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
     :param swing_angle: the angle the planar F--mu--F molecule makes with the 2F+plane_atom plane
     :param nnnness: nnnness of the calculation
     :param squish_radii: list of perturbations to the structure for [nn, nnn, nnnn, ...], towards the muon.
+    :param lambda_squish: (see https://arxiv.org/abs/2003.02762), the factor to perturb all the nns above what is
+                           defined in squish_radii by. >1 is *not really* physical, but not impossible (as this
+                           takes into account both physical nuclear movements *and* decoherence 'movements')
     :return: TDecoherenceAtom Muon, list[TDecoAtom] All_spins (including muon in pos 0)
     """
 
@@ -95,19 +103,24 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
     # mu_gui = GUI(mu_img)
     # mu_gui.run()
 
-    mu_atoms_nnn = ase_nnnfinder(atoms_mu=mu_atoms, nnnness=nnnness, squish_radii=squish_radii, supercell_size=3)
+    mu_atoms_nnn = ase_nnnfinder(atoms_mu=mu_atoms, nnnness=nnnness, squish_radii=squish_radii,
+                                 lambda_squish=lambda_squish, supercell_size=3)
 
     # return muon, All_Spins
     return aseatoms_to_tdecoatoms(mu_atoms_nnn)
 
 
-def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supercell_size: int = None) -> Atoms:
+def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supercell_size: int = None,
+                  lambda_squish: float = 1) -> Atoms:
     """
     Find nearest-neighbours using ASE
     :param atoms_mu: ASE atoms with muon
     :param nnnness: nnnness to get
     :param squish_radii: list of perturbations to the structure for [nn, nnn, nnnn, ...]
     :param supercell_size: size of supercell to look for nearest neighbours in. Should be odd.
+    :param lambda_squish: (see https://arxiv.org/abs/2003.02762), the factor to perturb all the nns above what is
+                           defined in squish_radii by. >1 is *not really* physical, but not impossible (as this
+                           takes into account both physical nuclear movements *and* decoherence 'movements')
     :return: ASE Atoms with just the nnnness asked for
     """
 
@@ -116,12 +129,6 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
     # supercell must have odd dimensions
     if supercell_size % 2 == 0:
         supercell_size += 1
-    # force squish radii to be the right size for nnnness
-    if squish_radii is not None:
-        squish_radii_len = len(squish_radii)
-        if squish_radii_len < nnnness - 1:
-            for _ in range(0, nnnness - squish_radii_len - 1):
-                squish_radii.append(None)
 
     # make a supercell
     supercell = build.make_supercell(atoms_mu, np.diag([supercell_size, supercell_size, supercell_size]))
@@ -202,10 +209,12 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
         if squish_radii is not None and nearest_neighbour_atoms[i_nearest_neighbour].symbol != 'mu':
             # squish radius for this nnnness (nnnness_atoms defines this)
             current_nnnness = nnnness_atoms[i_nearest_neighbour]
-            this_squish = squish_radii[current_nnnness - 2]
-            # if the squish radius is defined, and this squish is not bigger than the nnnness beyond that asked for
-            if this_squish is not None:  # and this_squish <= max_squish_radius: removed -- why not have things bigger?!
-                nearest_neighbour_atoms.set_distance(0, i_nearest_neighbour, squish_radii[current_nnnness - 2], 0)
+            if len(squish_radii) > current_nnnness - 2:
+                this_squish = squish_radii[current_nnnness - 2]
+            else:
+                this_squish = mu_distances[i_nearest_neighbour][1] * lambda_squish
+            if this_squish is not None:
+                nearest_neighbour_atoms.set_distance(0, i_nearest_neighbour, this_squish, 0)
 
     return nearest_neighbour_atoms
 
