@@ -158,4 +158,8 @@ nucleon_properties = {
            "gyromag_ratio": 70.76186,
            "abundance": 1
            },
+    "Y": {"II": 1,
+          "gyromag_ratio": 13.1067,
+          "abundance": 1
+    }
 }

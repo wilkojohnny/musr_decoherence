@@ -1,7 +1,7 @@
 """
 AtomObtainerN.py -- get atoms using the tools in ASE
-Allows getting atoms from .cif files, and for the user to define the muon location using a GUI (easier than faffing
-with locations, squish factors, etc!)
+Allows getting atoms from .cif or .pwo files, and for the user to define the muon location using a GUI (easier than
+faffing with locations, squish factors, etc!)
 Created 23/3/2020 by John Wilkinson (during COVID isolation!)
 """
 
@@ -16,8 +16,8 @@ import math
 
 
 def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: int = 2, squish_radii: list = None,
-                          lambda_squish: float = 1, enforce_nn_dist: float = 0, enforced_nn_indices: list = None)\
-        -> (Matom, list):
+                          lambda_squish: float = 1, enforce_nn_dist: float = 0, enforced_nn_indices: list = None,
+                          included_nuclei: list = None) -> (Matom, list):
     """
     Get the TDecoAtoms muon, All_Spins in a *linear* F--mu--F state for these calculations
     :param ase_atoms: ASE atoms of the structure (without muon)
@@ -29,6 +29,8 @@ def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: 
                            takes into account both physical nuclear movements *and* decoherence 'movements')
     :param enforce_nn_dist: perturbs the selected two atoms which define the muon location
     :param enforced_nn_indices: indices of the two atoms to perturb before nnnness
+    :param included_nuclei: list of the symbols of nuclei to be converted. Useful if you want to ignore nuclei of a
+                            certain type (e.g if they have small magnetic moments)
     :return: TDecoherenceAtom Muon, list[TDecoAtom] All_spins (including muon in pos 0)
     """
 
@@ -40,11 +42,12 @@ def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: 
                                  lambda_squish=lambda_squish, supercell_size=5)
 
     # return muon, All_Spins
-    return aseatoms_to_tdecoatoms(nnn_aseatoms)
+    return aseatoms_to_tdecoatoms(nnn_aseatoms, included_nuclei=included_nuclei)
 
 
 def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180,
-                        swing_angle: float = 0, nnnness: int = 2, squish_radii: list = None, lambda_squish: float = 1):
+                        swing_angle: float = 0, nnnness: int = 2, squish_radii: list = None, lambda_squish: float = 1,
+                        included_nuclei: list = None) -> (Matom, list):
     """
     Get F--mu--F atom + nnnness environment for a bent F--mu--F bond (see pg 123 lab book 2)
     :param ase_atoms: ASE atoms of the structure, without the muon
@@ -58,6 +61,8 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
     :param lambda_squish: (see https://arxiv.org/abs/2003.02762), the factor to perturb all the nns above what is
                            defined in squish_radii by. >1 is *not really* physical, but not impossible (as this
                            takes into account both physical nuclear movements *and* decoherence 'movements')
+    :param included_nuclei: list of the symbols of nuclei to be converted. Useful if you want to ignore nuclei of a
+                            certain type (e.g if they have small magnetic moments)
     :return: TDecoherenceAtom Muon, list[TDecoAtom] All_spins (including muon in pos 0)
     """
 
@@ -107,7 +112,7 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
                                  lambda_squish=lambda_squish, supercell_size=3)
 
     # return muon, All_Spins
-    return aseatoms_to_tdecoatoms(mu_atoms_nnn)
+    return aseatoms_to_tdecoatoms(mu_atoms_nnn, included_nuclei=included_nuclei)
 
 
 def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supercell_size: int = None,
@@ -213,18 +218,25 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
                 this_squish = squish_radii[current_nnnness - 2]
             else:
                 this_squish = mu_distances[i_nearest_neighbour][1] * lambda_squish
+                # if this wants to squish loads, put out a warning
+                if this_squish < squish_radii[-1]:
+                    print('The lambda_squish is bring the atoms in closer than the last squish value. Be careful with '
+                          'the results.')
             if this_squish is not None:
                 nearest_neighbour_atoms.set_distance(0, i_nearest_neighbour, this_squish, 0)
 
     return nearest_neighbour_atoms
 
 
-def aseatoms_to_tdecoatoms(atoms: Atoms, muon_array_id: int = 0, muon_centred_coords: bool = True) -> (Matom, list):
+def aseatoms_to_tdecoatoms(atoms: Atoms, muon_array_id: int = 0, muon_centred_coords: bool = True,
+                            included_nuclei: list = None) -> (Matom, list):
     """
     Converts ASE Atoms into an array of TDecoerenceAtom objects
     :param atoms: ASE atoms
     :param muon_array_id: id of the muon location in atoms
     :param muon_centred_coords: centre coordinates on the muon
+    :param included_nuclei: list of the symbols of nuclei to be converted. Useful if you want to ignore nuclei of a
+                            certain type (e.g if they have small magnetic moments)
     :return: muon, list of TDecoherenceAtoms (with muon in position 0)
     """
 
@@ -245,8 +257,10 @@ def aseatoms_to_tdecoatoms(atoms: Atoms, muon_array_id: int = 0, muon_centred_co
     for i_atom in range(0, len(atoms)):
         if i_atom != muon_array_id:
             atom_location = coord(atoms[i_atom].position[0], atoms[i_atom].position[1], atoms[i_atom].position[2])
-            All_spins.append(Matom(position=atom_location - muon_location * muon_centred_coords,
-                                   name=atoms[i_atom].symbol))
+            # if there is no restrictions on the included nuclei, or the nucleus in question is marked for inclusion
+            if included_nuclei is None or atoms[i_atom].symbol in included_nuclei:
+                All_spins.append(Matom(position=atom_location - muon_location * muon_centred_coords,
+                                       name=atoms[i_atom].symbol))
 
     return muon, All_spins
 
