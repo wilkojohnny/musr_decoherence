@@ -1,28 +1,28 @@
 # DipolePolarisation.py -- calculates sum_{nnnness} [n atoms in nnnness]/r_{nnnness}^6, until convergence
 # John Wilkinson 16/12/19
 import AtomObtainer  # for nnnfinder
-from MDecoherenceAtom import TDecoherenceAtom as atom  # for atom object
-import TCoord3D as coord  # for 3D coordinates
+from ase import Atoms, build
+import MDecoherenceAtom
+import numpy as np
 
 
 # calc_required_perturbation -- calculates the perturbation of the pert_nnnness nuclei (radially towards (-) or away (+)
 # from original positions).
-def calc_required_perturbation(muon_position, squish_radius=None, pert_nnnness=2, end_nnnness=-1, end_tol=1e-6,
-                               max_nn_search_radius=20,
-                               # arguments for manual input of lattice
-                               lattice_type=None, lattice_parameter=None, lattice_angles=None,
-                               input_coord_units=AtomObtainer.position_units.ALAT, atomic_basis=None,
-                               perturbed_distances=None):
-
+def calc_required_perturbation_old(muon_position, squish_radius=None, pert_nnnness=2, end_nnnness=-1, end_tol=1e-6,
+                                   max_nn_search_radius=20,
+                                   # arguments for manual input of lattice
+                                   lattice_type=None, lattice_parameter=None, lattice_angles=None,
+                                   input_coord_units=AtomObtainer.position_units.ALAT, atomic_basis=None,
+                                   perturbed_distances=None):
     # calculate the variance
-    B_variance = calc_variance(muon_position=muon_position, squish_radius=squish_radius, start_nnnness=pert_nnnness,
-                               end_nnnness=end_nnnness, end_tol=end_tol, max_nn_search_radius=max_nn_search_radius,
-                               lattice_type=lattice_type, lattice_parameter=lattice_parameter,
-                               lattice_angles=lattice_angles, input_coord_units=input_coord_units,
-                               atomic_basis=atomic_basis, perturbed_distances=perturbed_distances)
+    b_variance = calc_variance_old(muon_position=muon_position, squish_radius=squish_radius, start_nnnness=pert_nnnness,
+                                   end_nnnness=end_nnnness, end_tol=end_tol, max_nn_search_radius=max_nn_search_radius,
+                                   lattice_type=lattice_type, lattice_parameter=lattice_parameter,
+                                   lattice_angles=lattice_angles, input_coord_units=input_coord_units,
+                                   atomic_basis=atomic_basis, perturbed_distances=perturbed_distances)
 
     # get the start_nnnness term
-    muon, All_Spins, _ = AtomObtainer.get_spins(muon_position=muon_position, squish_radius=squish_radius,
+    muon, all_spins, _ = AtomObtainer.get_spins(muon_position=muon_position, squish_radius=squish_radius,
                                                 lattice_type=lattice_type, lattice_parameter=lattice_parameter,
                                                 lattice_angles=lattice_angles, input_coord_units=input_coord_units,
                                                 atomic_basis=atomic_basis, perturbed_distances=perturbed_distances,
@@ -32,24 +32,23 @@ def calc_required_perturbation(muon_position, squish_radius=None, pert_nnnness=2
     # calculate the required perturbation
     # calculate the
     gyro_ii = 0
-    for i in range(1, len(All_Spins)):
-        gyro_ii += All_Spins[i].II / 2 * (All_Spins[i].II / 2 + 1) * pow(All_Spins[i].gyromag_ratio, 2)
+    for i in range(1, len(all_spins)):
+        gyro_ii += all_spins[i].II / 2 * (all_spins[i].II / 2 + 1) * pow(all_spins[i].gyromag_ratio, 2)
 
     print(gyro_ii)
-    print(All_Spins[1].position.r())
-    required_perturbation = pow(B_variance/gyro_ii, -1/6) - All_Spins[1].position.r()
+    print(all_spins[1].position.r())
+    required_perturbation = pow(b_variance / gyro_ii, -1 / 6) - all_spins[1].position.r()
 
     print('required perturbation = ' + str(required_perturbation))
 
     return required_perturbation
 
 
-def calc_variance(muon_position, squish_radius=None, start_nnnness=2, end_nnnness=-1, end_tol=1e-6,
-                  max_nn_search_radius=20,
-                  # arguments for manual input of lattice
-                  lattice_type=None, lattice_parameter=None, lattice_angles=None,
-                  input_coord_units=AtomObtainer.position_units.ALAT, atomic_basis=None, perturbed_distances=None):
-
+def calc_variance_old(muon_position, squish_radius=None, start_nnnness=2, end_nnnness=-1, end_tol=1e-6,
+                      max_nn_search_radius=20,
+                      # arguments for manual input of lattice
+                      lattice_type=None, lattice_parameter=None, lattice_angles=None,
+                      input_coord_units=AtomObtainer.position_units.ALAT, atomic_basis=None, perturbed_distances=None):
     current_sum = 0
 
     # header
@@ -71,7 +70,7 @@ def calc_variance(muon_position, squish_radius=None, start_nnnness=2, end_nnnnes
                 average_gyromag_i += pow(basis_atom.gyromag_ratio, 2) * basis_atom.II / 2 * (basis_atom.II / 2 + 1) \
                                      / len(atomic_basis)
             # estimate the rest fof the sum with an integral (assuming number of nns is 4*pi*r^2
-            integral_extra = 4*3.1415926/(3*pow(r, 3))*average_gyromag_i
+            integral_extra = 4 * 3.1415926 / (3 * pow(r, 3)) * average_gyromag_i
             print('Adding on an extra ' + str(integral_extra) + ' with the integral')
             current_sum = current_sum + integral_extra
             print('Total variance of B-field is ' + str(current_sum))
@@ -79,31 +78,131 @@ def calc_variance(muon_position, squish_radius=None, start_nnnness=2, end_nnnnes
         old_sum = current_sum
 
         # get the atoms which are nnn away from the muon
-        muon, All_Spins, _ = AtomObtainer.get_spins(muon_position, squish_radius, lattice_type, lattice_parameter,
+        muon, all_spins, _ = AtomObtainer.get_spins(muon_position, squish_radius, lattice_type, lattice_parameter,
                                                     lattice_angles, input_coord_units, atomic_basis,
                                                     perturbed_distances, max_nn_search_radius=max_nn_search_radius,
                                                     nnnness=nnnness, exclusive_nnnness=True, shutup=False)
 
         # calculate r
-        r = (muon.position - All_Spins[1].position).r()
+        r = (muon.position - all_spins[1].position).r()
 
         # calculate this term in the sum
         new_term = 0
-        for i in range(1, len(All_Spins)):
-            new_term += All_Spins[i].II/2*(All_Spins[i].II/2 + 1)*pow(All_Spins[i].gyromag_ratio, 2)
-        new_term *= 1/pow(r, 6)
+        for i in range(1, len(all_spins)):
+            new_term += all_spins[i].II / 2 * (all_spins[i].II / 2 + 1) * pow(all_spins[i].gyromag_ratio, 2)
+        new_term *= 1 / pow(r, 6)
 
         # update sum
         current_sum = current_sum + new_term
 
         # calculate extent of convergence
         if old_sum != 0:
-            rel_diff = current_sum/old_sum - 1
+            rel_diff = current_sum / old_sum - 1
         else:
             rel_diff = 999
 
         # print out findings
-        print(str(nnnness) + '\t' + str(r) + '\t' + str(len(All_Spins) - 1) + '\t' + str(new_term) + '\t' +
+        print(str(nnnness) + '\t' + str(r) + '\t' + str(len(all_spins) - 1) + '\t' + str(new_term) + '\t' +
               str(current_sum) + '\t' + str(rel_diff))
 
     return current_sum
+
+
+def calc_lambda_squish(unit_cell: Atoms, squish_nnnness: list, max_exact_distance: float = 20,
+                       included_atoms: list = None, nnnness_tol=1e-3):
+    """
+    Calculates the required lambda_squish to account for the atoms beyond those in squish_nnnness.
+    :param unit_cell: ASE atoms, including muon
+    :param squish_nnnness: list of nnnnesses which are to be squished, e.g to squish nnn only do [3], or for nnn+nnnn do [3, 4]
+    :param max_exact_distance: maximum distance between muon--atom for the exact calculation; beyond this an integral
+                                is used to calculate the contribution to the NMR linewidth
+    :param included_atoms: list of strings of atoms to include in the calculation (e.g ['F'], for just F, ['F', 'Na']
+                            for Na and F)
+    :param nnnness_tol: maximum distance between two nuclei for them to both be considered as nearest-neighbours.
+    :return: value of lambda_squish
+    """
+
+    # find where the muon is in atoms object
+    muon_unit_cell_id = None
+    for atom_id, atom in enumerate(unit_cell):
+        if atom.symbol == 'mu':
+            muon_unit_cell_id = atom_id
+        elif atom.symbol == 'H' and muon_unit_cell_id is None:
+            muon_unit_cell_id = -1*atom_id
+
+    assert muon_unit_cell_id is not None
+
+    if muon_unit_cell_id < 0:
+        # The muon's label is H
+        muon_unit_cell_id *= -1
+
+    # by calculating the minimum distance between the muon and the supercell edge, guess the supercellness required
+    muon_scaled_position = unit_cell.get_scaled_positions()[muon_unit_cell_id]
+    muon_scaled_cell_distances = np.abs(np.round(muon_scaled_position, 0) - muon_scaled_position)
+    unit_cell_lengths = unit_cell.get_cell_lengths_and_angles()[0:3]
+    mu_cell_dist = muon_scaled_cell_distances * unit_cell_lengths
+    # calculate (roughly) how much of a supercell we need, using the max_exact_distance (and make it odd!)
+    supercell_dim = 2 * max(np.ceil((max_exact_distance - mu_cell_dist) / unit_cell_lengths)) + 1
+
+    # remove muon and build the supercell
+    del unit_cell[muon_unit_cell_id]
+    supercell = build.make_supercell(unit_cell, np.diag([supercell_dim, supercell_dim, supercell_dim]))
+
+    # put the muon back in
+    muon_pos_supercell_scaled = (muon_scaled_position + (supercell_dim - 1) / 2) / supercell_dim
+    muon_supercell = Atoms(symbols=['mu'], scaled_positions=[muon_pos_supercell_scaled], cell=supercell.get_cell())
+    muon_supercell_muon = muon_supercell[0]
+    supercell.append(muon_supercell_muon)
+
+    # delete the muon_supercell as this should never be used again
+    del muon_supercell
+
+    # order all the atoms by distance from the muon, if it is wanted...
+    muon_distances = []
+    for i_atom, atom in enumerate(supercell):
+        if atom.symbol in included_atoms:
+            muon_distance = supercell.get_distances(-1, [i_atom])
+            muon_distances.append((atom.symbol, muon_distance))
+
+    # sort the muon distances
+    muon_distances = sorted(muon_distances, key=lambda element: element[1])
+
+    # check our supercell is big enough -- if not, kick up (means I need to fix something!)
+    assert muon_distances[-1][1] >= max_exact_distance
+
+    # \sigma^2 for the atoms being squished by \lambda_squish, and those that are not
+    squish_variance_contribution = 0
+    non_squish_variance_contribution = 0
+    current_nnnness = 1
+    current_mu_at_dist = 0
+    start_nnnness = min(squish_nnnness)
+    for symbol, distance_from_muon in muon_distances:
+        # are we in a new nnnness shell?
+        if distance_from_muon > current_mu_at_dist + nnnness_tol:
+            # yes we are
+            current_nnnness += 1
+            current_mu_at_dist = distance_from_muon
+            # if distance is too great, break
+            if distance_from_muon > max_exact_distance:
+                break
+        # do we care about this nnnness?
+        if current_nnnness >= start_nnnness:
+            # we do -- so calculate the lambda contribution for these up to the distance required
+            gyromagnetic_ratio = MDecoherenceAtom.nucleon_properties[symbol]["gyromag_ratio"]
+            II = MDecoherenceAtom.nucleon_properties[symbol]["II"]
+            I = II / 2
+            # dont do isotopes for now
+            assert MDecoherenceAtom.nucleon_properties[symbol]["abundance"] == 1
+
+            lambda_contribution = I * (I + 1) * gyromagnetic_ratio ** 2 / (distance_from_muon ** 6)
+            non_squish_variance_contribution += lambda_contribution
+            if current_nnnness in squish_nnnness:
+                squish_variance_contribution += lambda_contribution
+
+    # add on the integral to deal with everything up to infinity
+    cell_density = supercell.get_number_of_atoms() / supercell.get_volume()
+    integral_contribution = (4 * np.pi / 3) * 1 / (max_exact_distance ** 6) * cell_density
+    non_squish_variance_contribution += integral_contribution
+
+    # find lambda_squish
+    return (squish_variance_contribution / non_squish_variance_contribution) ** (1 / 6)
