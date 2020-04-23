@@ -4,6 +4,7 @@ import AtomObtainer  # for nnnfinder
 from ase import Atoms, build
 import MDecoherenceAtom
 import numpy as np
+import copy
 
 
 # calc_required_perturbation -- calculates the perturbation of the pert_nnnness nuclei (radially towards (-) or away (+)
@@ -121,6 +122,8 @@ def calc_lambda_squish(unit_cell: Atoms, squish_nnnness: list, max_exact_distanc
     :param nnnness_tol: maximum distance between two nuclei for them to both be considered as nearest-neighbours.
     :return: value of lambda_squish
     """
+
+    unit_cell = copy.deepcopy(unit_cell)
 
     # find where the muon is in atoms object
     muon_unit_cell_id = None
