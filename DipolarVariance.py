@@ -188,6 +188,10 @@ def calc_lambda_squish(unit_cell: Atoms, squish_nnnness: list, max_exact_distanc
             # if distance is too great, break
             if distance_from_muon > max_exact_distance:
                 break
+        # print nnnness
+        if current_nnnness <= start_nnnness + 1:
+            [print('n', end='') for _ in range(0, current_nnnness)]
+            print(': ' + symbol + ' at distance '+ str(distance_from_muon), end='\n')
         # do we care about this nnnness?
         if current_nnnness >= start_nnnness:
             # we do -- so calculate the lambda contribution for these up to the distance required

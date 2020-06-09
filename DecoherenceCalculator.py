@@ -43,7 +43,6 @@ def calc_hamiltonian_term(spins, i, j):
                                      * (j_x * r.xhat() + j_y * r.yhat() + j_z * r.zhat()))
 
 
-# calculate entire hamiltonian
 def calc_dipolar_hamiltonian(spins, just_muon_interactions=False):
     current_hamiltonian = 0
 
@@ -58,6 +57,62 @@ def calc_dipolar_hamiltonian(spins, just_muon_interactions=False):
         for j in range(i + 1, len(spins)):
             current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
     return current_hamiltonian
+
+
+def calc_quadrupolar_hamiltonian(spins):
+    current_hamiltonian = 0
+    for spin_i, spin in enumerate(spins):
+        if spin.II > 1 and abs(spin.Q) > 0:
+            i_x = measure_ith_spin(spins, spin_i, spin.pauli_x)
+            i_y = measure_ith_spin(spins, spin_i, spin.pauli_y)
+            i_z = measure_ith_spin(spins, spin_i, spin.pauli_z)
+
+            v_xx = spin.efg[0, 0]
+            v_yy = spin.efg[1, 1]
+            v_zz = spin.efg[2, 2]
+            v_xy = spin.efg[0, 1]
+            v_yz = spin.efg[1, 2]
+            v_xz = spin.efg[0, 2]
+
+            quadrupole_term = 434.4557 * spin.Q * (1 + spin.anti_shielding) / (spin.II * (spin.II - 1)) * \
+                              (v_xx*(i_x ** 2) + v_yy * (i_y ** 2) + v_zz * (i_z ** 2)
+                               + v_xy*(i_x*i_y + i_y*i_x) + v_yz*(i_y*i_z + i_z*i_y) + v_xz*(i_x*i_z + i_z*i_x))
+
+            current_hamiltonian = current_hamiltonian + quadrupole_term
+    return current_hamiltonian
+
+
+def calc_efg(spins: list, i_spin: int) -> [float, float, float]:
+    """
+    Estimates the EFG for the spin spins[i_spin] due to the others.
+    !! WARNING -- does not check that V_xy=V_yz=V_zx=0 (yet...)
+    :param spins: list of TDecoherenceAtoms which have charge, and Q defined
+    :param i_spin: particular spin we are looking at.
+    :return: [V_xx, V_yy, V_zz] in angstrom^-3
+    """
+
+    # check that i_spin supports quadrupolar interaction
+    if spins[i_spin].II == 1:
+        return [0, 0, 0]
+
+    V_xx = 0
+    V_yy = 0
+    V_zz = 0
+
+    # for each spin
+    for j_spin, spin in enumerate(spins):
+        if i_spin == j_spin:
+            continue
+        rel_position = spin.position - spins[i_spin].position
+        q = spin.charge
+        r_i5 = rel_position.r() ** 5
+        V_xx += q / r_i5 * (3 * (rel_position.ortho_x ** 2) - rel_position.r() ** 2)
+        V_yy += q / r_i5 * (3 * (rel_position.ortho_y ** 2) - rel_position.r() ** 2)
+        V_zz += q / r_i5 * (3 * (rel_position.ortho_z ** 2) - rel_position.r() ** 2)
+
+    spins[i_spin].efg = [V_xx, V_yy, V_zz]
+
+    return [V_xx, V_yy, V_zz]
 
 
 def calc_zeeman_hamiltonian(spins, field: coord.TCoord3D):

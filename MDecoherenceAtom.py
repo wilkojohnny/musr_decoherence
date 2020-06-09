@@ -13,7 +13,8 @@ from ase.gui.images import Images  # to make the atoms GUI-able
 
 class TDecoherenceAtom:
 
-    def __init__(self, position: TCoord3D, name: str, gyromag_ratio=None, II=None, abundance=1.):
+    def __init__(self, position: TCoord3D, name: str, gyromag_ratio=None, II=None, abundance=1., charge=None, Q=None,
+                 anti_shielding=None, efg: np.ndarray = None):
 
         # if only name is defined, then get the numbers from the database
         if gyromag_ratio is None or II is None:
@@ -21,6 +22,10 @@ class TDecoherenceAtom:
                 gyromag_ratio = nucleon_properties[name]['gyromag_ratio']
                 II = nucleon_properties[name]['II']
                 abundance = nucleon_properties[name]['abundance']
+                charge = nucleon_properties[name]['charge']
+                if II > 1:
+                    Q = nucleon_properties[name]['Q']
+                    anti_shielding = nucleon_properties[name]['anti_shielding']
             except KeyError:
                 print('WARNING -- Atom ' + name + ' is not in the database. The magnetic properties will be ignored.')
                 II = 0
@@ -35,6 +40,14 @@ class TDecoherenceAtom:
         self.name = name
         self.abundance = abundance
         self.isotopes = []
+        self.charge = charge
+        self.Q = Q
+        self.anti_shielding = anti_shielding
+        self.efg = efg  # EFG is [V_xx, V_yy, V_zz] in Å^-3
+
+        # check values make sense for quadrupoles
+        if Q is not None:
+            assert II > 1
 
         if type(abundance) is np.ndarray:
             # if there's more than one isotope, register them as a list
@@ -50,9 +63,9 @@ class TDecoherenceAtom:
             # pauli z
             self.pauli_z = .5*np.array(spmat.diags([m for m in range(-II, II+2, 2)])) # the self.II+2 is due to Python using exclusive ranges
             # pauli +
-            self.pauli_plus = np.array(spmat.diags([np.sqrt(self.I*(self.I+1) - .5*m*(.5*m+1)) for m in range(-II, II, 2)], 1))
+            self.pauli_plus = spmat.diags([np.sqrt(self.I*(self.I+1) - .5*m*(.5*m+1)) for m in range(-II, II, 2)], 1)
             # pauli -
-            self.pauli_minus = np.array(spmat.diags([np.sqrt(self.I * (self.I + 1) - .5 * m * (.5 * m + 1)) for m in range(-II, II, 2)], -1))
+            self.pauli_minus = spmat.diags([np.sqrt(self.I * (self.I + 1) - .5 * m * (.5 * m + 1)) for m in range(-II, II, 2)], -1)
 
             # calculate pauli x and y
             self.pauli_x = .5*(self.pauli_plus + self.pauli_minus)
@@ -142,24 +155,52 @@ def visualise_atoms(input_atoms: list):
 
 # dictionary for nuclei. Append as and when more are needed.
 # Numbers from https://web.archive.org/web/20180305085231/http://www.kayelaby.npl.co.uk/chemistry/3_8/3_8_1.html
+# UNITS:
+#   - II = 2*I, nuclear moment
+#   - gyromag_ratio = 2*pi*gamma_i
+#   - abundance: fractional abundance (eg 0.5 = 50%)
+#   - Q: in 10^-28 m^2
+#   - charge: in units of e
 nucleon_properties = {
     "mu": {"II": 1,
            "gyromag_ratio": 851.372,
-           "abundance": 1},
+           "abundance": 1,
+           "Q": 0,
+           "charge": +1,
+           "anti_shielding": 0
+    },
+    "H": {"II": 1,
+          "gyromag_ratio": 267.512,
+          "abundance": 1,
+          "Q": 0,
+          "charge": +1},
     "Li": {"II": np.array([2, 3]),
            "gyromag_ratio": np.array([6.2655, 16.5465])*2*3.4145926,
            "abundance": np.array([0.0742, 0.9258])
            },
     "F": {"II": 1,
           "gyromag_ratio": 251.713,
-          "abundance": 1
+          "abundance": 1,
+          "Q": 0,
+          "charge": -1,
+          "anti_shielding": 0
           },
     "Na": {"II": 3,
            "gyromag_ratio": 70.76186,
-           "abundance": 1
+           "abundance": 1,
+           "Q": 0.1,
+           "charge": +1,
+           "anti_shielding": 4
            },
+    "Sc": {"II": 7,
+           "gyromag_ratio": 64.9895,
+           "abundance": 1,
+           "Q": -0.22,
+           "charge": +3,
+           "anti_shielding": +11.2 # from PRA *8* 1169 (1973)
+    },
     "Y": {"II": 1,
-          "gyromag_ratio": 13.1067,
+          "gyromag_ratio": -13.1067,
           "abundance": 1
     }
 }

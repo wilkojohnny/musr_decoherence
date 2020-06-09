@@ -5,14 +5,16 @@ faffing with locations, squish factors, etc!)
 Created 23/3/2020 by John Wilkinson (during COVID isolation!)
 """
 
-from ase import Atoms, atom
+import math
+
+import numpy as np
+from ase import Atoms, atom, io
+from ase import build
 from ase.gui.gui import GUI
 from ase.gui.images import Images
-from ase import build
-import numpy as np
+
 from MDecoherenceAtom import TDecoherenceAtom as Matom  # import class for decoherence atom
 from TCoord3D import TCoord3D as coord
-import math
 
 
 def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: int = 2, squish_radii: list = None,
@@ -47,7 +49,8 @@ def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: 
 
 def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180,
                         swing_angle: float = 0, nnnness: int = 2, squish_radii: list = None, lambda_squish: float = 1,
-                        included_nuclei: list = None) -> (Matom, list):
+                        included_nuclei: list = None, muon_centred_coords: bool = True,
+                        nnnness_shells: bool = True) -> (Matom, list):
     """
     Get F--mu--F atom + nnnness environment for a bent F--mu--F bond (see pg 123 lab book 2)
     :param ase_atoms: ASE atoms of the structure, without the muon
@@ -63,6 +66,8 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
                            takes into account both physical nuclear movements *and* decoherence 'movements')
     :param included_nuclei: list of the symbols of nuclei to be converted. Useful if you want to ignore nuclei of a
                             certain type (e.g if they have small magnetic moments)
+    :param muon_centred_coords: whether to translate coordinates such that the muon is at (0,0,0).
+    :param nnnness_shells: whether to group the atoms in nnnness. If false, each atom has its own nnnness.
     :return: TDecoherenceAtom Muon, list[TDecoAtom] All_spins (including muon in pos 0)
     """
 
@@ -109,25 +114,73 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
     # mu_gui.run()
 
     mu_atoms_nnn = ase_nnnfinder(atoms_mu=mu_atoms, nnnness=nnnness, squish_radii=squish_radii,
-                                 lambda_squish=lambda_squish, supercell_size=3)
+                                 lambda_squish=lambda_squish, supercell_size=3, nnnness_shells=nnnness_shells)
 
     # return muon, All_Spins
-    return aseatoms_to_tdecoatoms(mu_atoms_nnn, included_nuclei=included_nuclei)
+    return aseatoms_to_tdecoatoms(mu_atoms_nnn, included_nuclei=included_nuclei, muon_centred_coords=muon_centred_coords)
 
 
-def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supercell_size: int = None,
-                  lambda_squish: float = 1) -> Atoms:
+def ase_nnnfinder(nnnness: int, pwo_file: str = None, atoms_mu: Atoms = None, squish_radii: list = None,
+                  supercell_size: int = None, lambda_squish: float = 1, lambda_start_nnnness = None,
+                  dft_correction: float = 0, nnnness_shells: bool = True) -> Atoms:
     """
     Find nearest-neighbours using ASE
-    :param atoms_mu: ASE atoms with muon
     :param nnnness: nnnness to get
+    :param pwo_file: location of pwo file to use. Do not define this and atoms_mu.
+    :param atoms_mu: ASE atoms with muon. Do not define this and atoms_mu.
     :param squish_radii: list of perturbations to the structure for [nn, nnn, nnnn, ...]
     :param supercell_size: size of supercell to look for nearest neighbours in. Should be odd.
     :param lambda_squish: (see https://arxiv.org/abs/2003.02762), the factor to perturb all the nns above what is
                            defined in squish_radii by. >1 is *not really* physical, but not impossible (as this
                            takes into account both physical nuclear movements *and* decoherence 'movements')
+    :param lambda_start_nnnness: nnnness where we start using lambda_squish. If None, it is applied at the end of
+                                the squish_radii
+    :param dft_correction: DFT correction factor to account for systematic DFT position deviations
+    :param nnnness_shells: whether to group the atoms in nnnness. If false, each atom has its own nnnness.
     :return: ASE Atoms with just the nnnness asked for
     """
+
+    # check only one of pwo_file or atoms_mu are set
+    assert (pwo_file is None) ^ (atoms_mu is None)
+
+    if lambda_start_nnnness is None:
+        lambda_start_nnnness = len(squish_radii) + 2
+
+    if not (0 <= dft_correction <= 1):
+        print('WARNING - To be physical, DFT correction should really be between 0 and 1.')
+
+    before_atoms_mu = None
+    if pwo_file is not None:
+        atoms_mu = io.read(pwo_file)
+        before_atoms_mu = io.read(pwo_file, 0)
+
+    # find out if we're using the symbol H or mu for the muon
+    muon_symbol = None
+    for i_atom, this_atom in enumerate(atoms_mu):
+        if this_atom.symbol == 'H':
+            muon_symbol = 'H'
+        elif this_atom.symbol == 'mu':
+            muon_symbol = 'mu'
+            break
+
+    # before we faff with a supercell (which is actually a super-supercell, if we're doing a DFT calculation)
+    # apply the DFT correction factor to all the atomic positions
+    if dft_correction != 0.0 and dft_correction is not None:
+        for i_atom, after_atom in enumerate(atoms_mu):
+            if after_atom.symbol != muon_symbol:
+                before_atom = before_atoms_mu[i_atom]
+                # check the atom type hasn't mysteriously changed...
+                assert before_atom.symbol == after_atom.symbol
+
+                # get the positions
+                before_atom_position = coord(before_atom.position[0], before_atom.position[1], before_atom.position[2])
+                after_atom_position = coord(after_atom.position[0], after_atom.position[1], after_atom.position[2])
+
+                # calculate the new position
+                correction = (before_atom_position - after_atom_position)*dft_correction
+
+                after_atom_position = after_atom_position + correction
+                after_atom.position = after_atom_position.toarray()
 
     if supercell_size is None:
         supercell_size = 2 * nnnness + 1
@@ -143,21 +196,8 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
     # make them all positive and continue. If there is one +ve entry, scrap the negative entries.
     supercell_muon_indexes = []
     for i_supercell_at in range(0, len(supercell)):
-        if supercell[i_supercell_at].symbol == 'mu':
+        if supercell[i_supercell_at].symbol == muon_symbol:
             supercell_muon_indexes.append(i_supercell_at)
-        elif supercell[i_supercell_at].symbol == 'H':
-            supercell_muon_indexes.append(-1 * i_supercell_at)
-
-    if max(supercell_muon_indexes) < 0:
-        # this means there is no mu, only H -- so make these muons
-        muon_symbol = 'H'
-        supercell_muon_indexes = [-1 * index for index in supercell_muon_indexes]
-    else:
-        muon_symbol = 'mu'
-        # get rid of the H indexes -- we have a muon!
-        for index in supercell_muon_indexes:
-            if index < 0:
-                del index
 
     muon_pos_x = 0
     muon_pos_y = 0
@@ -176,6 +216,13 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
     for atom in supercell:
         if atom.symbol != muon_symbol:
             supercell_onemuon.append(atom)
+
+    if before_atoms_mu is not None:
+        before_supercell = build.make_supercell(before_atoms_mu,
+                                                np.diag([supercell_size, supercell_size, supercell_size]))
+        before_supercell_onemuon = Atoms()
+        for atom in before_supercell:
+            before_supercell_onemuon.append(atom)
 
     del supercell
 
@@ -198,7 +245,8 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
     max_squish_radius = None
     for [atom_cellID, mu_at_dist] in mu_distances:
         # see if we are in a new sphere of nnnness
-        if abs(current_nnness_dist - mu_at_dist) > nn_tol:
+        if abs(current_nnness_dist - mu_at_dist) > nn_tol or (not nnnness_shells
+                                                              and supercell_onemuon[atom_cellID].symbol!='mu'):
             # we are in a new nnnness sphere -- so check it's wanted
             current_nnnness += 1
             if current_nnnness > nnnness:
@@ -214,14 +262,15 @@ def ase_nnnfinder(atoms_mu: Atoms, nnnness: int, squish_radii: list = None, supe
         if squish_radii is not None and nearest_neighbour_atoms[i_nearest_neighbour].symbol != 'mu':
             # squish radius for this nnnness (nnnness_atoms defines this)
             current_nnnness = nnnness_atoms[i_nearest_neighbour]
+            this_squish = None
             if len(squish_radii) > current_nnnness - 2:
                 this_squish = squish_radii[current_nnnness - 2]
-            else:
+            elif current_nnnness >= lambda_start_nnnness:
                 this_squish = mu_distances[i_nearest_neighbour][1] * lambda_squish
                 # if this wants to squish loads, put out a warning
                 if this_squish < squish_radii[-1]:
-                    print('The lambda_squish is bring the atoms in closer than the last squish value. Be careful with '
-                          'the results.')
+                    print('The lambda_squish brings in the atoms closer than the most distant squish value. Be careful '
+                          'with the results.')
             if this_squish is not None:
                 nearest_neighbour_atoms.set_distance(0, i_nearest_neighbour, this_squish, 0)
 
@@ -270,7 +319,7 @@ def add_muon_to_aseatoms(atoms: Atoms, muon_position: np.ndarray, nn_indices: li
     """
     Add a muon with position muon_position to ASE atoms. Only works for PLANAR F--mu--F.
     :param atoms: ASE atoms to add the muon to
-    :param muon_position: numpy array (x, y, z) of the muon position
+    :param muon_position: numpy array (x, y, z) of the muon position in CARTESIAN coordinates, in Angstroms
     :param nn_indices: indices of the nn atoms to perturb (if requried)
     :param enforce_nn_dist: perturbed distance
     :return: ASE atoms with the muon

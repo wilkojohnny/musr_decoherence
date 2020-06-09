@@ -74,7 +74,7 @@ def inc_isotope_id(basis, oldids=None):
 
 
 def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
-                     times: np.ndarray = np.arange(0, 10, 0.1),
+                     times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False,
                      # other arguments
                      fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
                      plot: bool = False, shutup: bool =False):
@@ -135,6 +135,9 @@ def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coor
 
         # calculate hamiltonian
         hamiltonian = decoCalc.calc_dipolar_hamiltonian(Spins)
+
+        if do_quadrupoles:
+            hamiltonian += decoCalc.calc_quadrupolar_hamiltonian(Spins)
 
         # find eigenvalues and eigenvectors of hamiltonian
         if not shutup:
