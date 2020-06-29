@@ -175,7 +175,7 @@ nucleon_properties = {
           "Q": 0,
           "charge": +1},
     "Li": {"II": np.array([2, 3]),
-           "gyromag_ratio": np.array([6.2655, 16.5465])*2*3.4145926,
+           "gyromag_ratio": np.array([6.2655, 16.5465])*2*3.14145926,
            "abundance": np.array([0.0742, 0.9258])
            },
     "F": {"II": 1,

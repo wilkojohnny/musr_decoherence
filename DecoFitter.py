@@ -4,28 +4,38 @@
 import numpy as np  # for numpy arrays
 import matplotlib.pyplot as pyplot  # for plotting
 import matplotlib.colors as color  # for colourful plots
-from lmfit import minimize, parameter, fit_report  # for nls curve fitting
+from lmfit import *  # for nls curve fitting
 
 
-def fit(data_file_location: str, fit_function, params: parameter, plot: bool, end_time=None):
+def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, end_time=None, just_plot=False):
     """
     :param data_file_location: location of the muon data file
     :param fit_function: function to be fitted
     :param params: fit parameters
     :param plot: True == do a plot of the result
     :param end_time: cutoff time for fitting
+    :param just_plot: if TRUE, just plots the parameters instead of doing an actual fit
     :return: lmfit.parameter object of the fit result
     """
+
+    if just_plot and not plot:
+        return params
+
     # load in the data (expect it of the form x y yerr)
     x, y, y_error = load_muon_data(data_file_location, end_time=end_time)
 
-    fit_result = minimize(residual, params, args=(fit_function, x, y, y_error), iter_cb=print_iteration)
+    fitted_params = params
 
-    print(fit_result.message)
-    print(fit_report(fit_result))
+    if not just_plot:
+        fit_result = minimize(residual, params, args=(fit_function, x, y, y_error), iter_cb=print_iteration)
+
+        print(fit_result.message)
+        print(fit_report(fit_result))
+
+        fitted_params = fit_result.params
 
     # calculate the fit function one last time
-    fit_func = fit_function(fit_result.params, x)
+    fit_func = fit_function(fitted_params, x)
 
     # plot the data
     if plot:
@@ -34,7 +44,18 @@ def fit(data_file_location: str, fit_function, params: parameter, plot: bool, en
         pyplot.ylim((-10, 30))
         pyplot.show()
 
-    return fit_result.params
+    return fitted_params
+
+
+def gle_friendly_out(fit_parameters):
+    # do labels
+    print('!\t', end='')
+    for name, _ in fit_parameters.items():
+        print(name + '\terr(' + name + ')\t', end='')
+    print('')
+    # print output
+    for _, parameter in fit_parameters.items():
+        print('\t' + str(parameter.value) + '\t' + str(parameter.stderr), end='')
 
 
 def print_iteration(params, iter, residuals, *args, **kwargs):

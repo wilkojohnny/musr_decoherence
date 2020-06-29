@@ -47,8 +47,8 @@ def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: 
     return aseatoms_to_tdecoatoms(nnn_aseatoms, included_nuclei=included_nuclei)
 
 
-def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180,
-                        swing_angle: float = 0, nnnness: int = 2, squish_radii: list = None, lambda_squish: float = 1,
+def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180, swing_angle: float = 0,
+                        nnnness: int = 2, squish_radii: list = None, lambda_squish: float = 1,
                         included_nuclei: list = None, muon_centred_coords: bool = True,
                         nnnness_shells: bool = True) -> (Matom, list):
     """
@@ -71,42 +71,7 @@ def get_bent_fmuf_atoms(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angl
     :return: TDecoherenceAtom Muon, list[TDecoAtom] All_spins (including muon in pos 0)
     """
 
-    # get position of midpoint, M, of the two F atoms
-    if isinstance(fluorines[0], int):
-        # get the coordinates from ase_atoms
-        f0_array = ase_atoms[fluorines[0]].position
-        f1_array = ase_atoms[fluorines[1]].position
-        f0 = coord(f0_array[0], f0_array[1], f0_array[2])
-        f1 = coord(f1_array[0], f1_array[1], f1_array[2])
-    else:
-        f0 = coord(fluorines[0][0], fluorines[0][1], fluorines[0][2])
-        f1 = coord(fluorines[1][0], fluorines[1][1], fluorines[1][2])
-
-    if isinstance(plane_atom, int):
-        plane_atom_position_array = ase_atoms[plane_atom].position
-        plane_atom_position = coord(plane_atom_position_array[0], plane_atom_position_array[1],
-                                    plane_atom_position_array[2])
-    else:
-        plane_atom_position = coord(plane_atom[0], plane_atom[1], plane_atom[2])
-
-    f0_to_midpoint = (f1 - f0) * 0.5
-    f_midpoint = f0 + f0_to_midpoint
-
-    # mu_protude is the displacement of the muon along the line plane_atom -> midpoint of F1-F2
-    f_mid_dist = f0_to_midpoint.r()
-    theta = (fmuf_angle % 360) * math.pi / 180
-    # noinspection PyTypeChecker
-    mu_protude = f_mid_dist * math.sqrt(2 / (1 - math.cos(theta))) * math.cos(theta / 2) \
-                 + f_mid_dist * math.sqrt(abs(1 - 2 / (1 - math.cos(theta)) * math.pow(math.sin(theta / 2), 2)))
-
-    mu_position = f_midpoint + (f_midpoint - plane_atom_position).rhat() * mu_protude
-
-    # rotate the muon position about axis 2F
-    if swing_angle != 0:
-        print('Sorry! Not implemented swing angle yet...')
-        assert False
-
-    mu_atoms = add_muon_to_aseatoms(atoms=ase_atoms, muon_position=mu_position.tonumpyarray())
+    mu_atoms = add_muon_to_aseatoms_bent(ase_atoms, fluorines, plane_atom, fmuf_angle, swing_angle)
 
     # mu_img = Images()
     # mu_img.initialize([mu_atoms])
@@ -336,6 +301,63 @@ def add_muon_to_aseatoms(atoms: Atoms, muon_position: np.ndarray, nn_indices: li
 
     return atoms
 
+
+def add_muon_to_aseatoms_bent(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180,
+                              swing_angle: float = 0) -> Atoms:
+    """
+    Adds a muon to ase atoms as a bent F--mu--F bond
+    :param ase_atoms: ASE atoms of the structure, without the muon
+    :param fluorines: The two fluorine nuclei which the muon primarily interacts with
+    :param plane_atom: the atom, with which the 2F+plane_atom make up the plane which the F--mu--F bond is on,
+                             or an angle swing_angle away from. (can be int of atom in ase_atoms, or coords)
+    :param fmuf_angle: the F--mu--F bond angle
+    :param swing_angle: the angle the planar F--mu--F molecule makes with the 2F+plane_atom plane
+    :return: ASE atoms, with muon
+    """
+
+    # get position of midpoint, M, of the two F atoms
+    if isinstance(fluorines[0], int):
+        # get the coordinates from ase_atoms
+        f0_array = ase_atoms[fluorines[0]].position
+        f1_array = ase_atoms[fluorines[1]].position
+        f0 = coord(f0_array[0], f0_array[1], f0_array[2])
+        f1 = coord(f1_array[0], f1_array[1], f1_array[2])
+    else:
+        f0 = coord(fluorines[0][0], fluorines[0][1], fluorines[0][2])
+        f1 = coord(fluorines[1][0], fluorines[1][1], fluorines[1][2])
+
+    if isinstance(plane_atom, int):
+        plane_atom_position_array = ase_atoms[plane_atom].position
+        plane_atom_position = coord(plane_atom_position_array[0], plane_atom_position_array[1],
+                                    plane_atom_position_array[2])
+    else:
+        plane_atom_position = coord(plane_atom[0], plane_atom[1], plane_atom[2])
+
+    f0_to_midpoint = (f1 - f0) * 0.5
+    f_midpoint = f0 + f0_to_midpoint
+
+    # mu_protude is the displacement of the muon along the line plane_atom -> midpoint of F1-F2
+    f_mid_dist = f0_to_midpoint.r()
+    theta = (fmuf_angle % 360) * math.pi / 180
+    # noinspection PyTypeChecker
+    mu_protude = f_mid_dist * math.sqrt(2 / (1 - math.cos(theta))) * math.cos(theta / 2) \
+                 + f_mid_dist * math.sqrt(abs(1 - 2 / (1 - math.cos(theta)) * math.pow(math.sin(theta / 2), 2)))
+
+    mu_position = f_midpoint + (f_midpoint - plane_atom_position).rhat() * mu_protude
+
+    # rotate the muon position about axis 2F
+    if swing_angle != 0:
+        print('Sorry! Not implemented swing angle yet...')
+        assert False
+
+    mu_atoms = add_muon_to_aseatoms(atoms=ase_atoms, muon_position=mu_position.tonumpyarray())
+
+    # mu_img = Images()
+    # mu_img.initialize([mu_atoms])
+    # mu_gui = GUI(mu_img)
+    # mu_gui.run()
+
+    return mu_atoms
 
 def get_muon_pos_nn_visually(atoms: Atoms) -> (np.ndarray, list):
     """

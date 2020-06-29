@@ -123,6 +123,52 @@ def calc_lambda_squish(unit_cell: Atoms, squish_nnnness: list, max_exact_distanc
     :return: value of lambda_squish
     """
 
+    squish_variance_contribution, non_squish_variance_contribution, _ = \
+        calc_dipolar_second_moment_sums(unit_cell, squish_nnnness, max_exact_distance, included_atoms, nnnness_tol)
+
+    # find lambda_squish
+    return (squish_variance_contribution / (non_squish_variance_contribution + squish_variance_contribution)) ** (1 / 6)
+
+
+def calc_unsquished_distance(r_squish: float, unit_cell: Atoms, squish_nnnness: list, max_exact_distance: float = 20,
+                             included_atoms: list = None, nnnness_tol=1e-3):
+    """
+    Calculates the value of the muon-squish_nnnness distance BEFORE squishing. Used to turn a fitted value of mu-x
+    distance into the 'actual' distance.
+    :param r_squish: value of mu-x distance after squishing (i.e what the fitting algorithm gives)
+    :param unit_cell: ASE atoms, including muon
+    :param squish_nnnness: list of nnnnesses which are to be squished, e.g to squish nnn only do [3], or for nnn+nnnn do [3, 4]
+    :param max_exact_distance: maximum distance between muon--atom for the exact calculation; beyond this an integral
+                                is used to calculate the contribution to the NMR linewidth
+    :param included_atoms: list of strings of atoms to include in the calculation (e.g ['F'], for just F, ['F', 'Na']
+                            for Na and F)
+    :param nnnness_tol: maximum distance between two nuclei for them to both be considered as nearest-neighbours.
+    :return: value of lambda_squish
+    :return: mu-squish_nnnesss distance before squishing
+    """
+
+    _, non_squish_variance_contribution, nuclear_magnetic_factor = \
+        calc_dipolar_second_moment_sums(unit_cell, squish_nnnness, max_exact_distance, included_atoms, nnnness_tol)
+
+    return (r_squish ** -6 - non_squish_variance_contribution / nuclear_magnetic_factor) ** (-1/6)
+
+
+def calc_dipolar_second_moment_sums(unit_cell: Atoms, squish_nnnness: list, max_exact_distance: float = 20,
+                                    included_atoms: list = None, nnnness_tol=1e-3) -> (float, float, float):
+    """
+    Calculates the sum of the second moment of the dipolar field
+    :param unit_cell: ASE atoms, including muon
+    :param squish_nnnness: list of nnnnesses which are to be squished, e.g to squish nnn only do [3], or for nnn+nnnn do [3, 4]
+    :param max_exact_distance: maximum distance between muon--atom for the exact calculation; beyond this an integral
+                                is used to calculate the contribution to the NMR linewidth
+    :param included_atoms: list of strings of atoms to include in the calculation (e.g ['F'], for just F, ['F', 'Na']
+                            for Na and F)
+    :param nnnness_tol: maximum distance between two nuclei for them to both be considered as nearest-neighbours.
+    :return: (float, float, float): contribution to the second moment due to the nuclei which will end up 'squished',
+                                  contribution to the second moment due to the nuclei which will NOT be 'squished' (i.e
+                                  will be represented by the 'squished' nuclei),
+                                  magnetic factor (sum over I(I+1)*gyromag_ratio^2) for squish atoms.
+    """
     unit_cell = copy.deepcopy(unit_cell)
 
     # find where the muon is in atoms object
@@ -176,6 +222,7 @@ def calc_lambda_squish(unit_cell: Atoms, squish_nnnness: list, max_exact_distanc
     # \sigma^2 for the atoms being squished by \lambda_squish, and those that are not
     squish_variance_contribution = 0
     non_squish_variance_contribution = 0
+    nuclear_magnetic_factor = 0
     current_nnnness = 1
     current_mu_at_dist = 0
     start_nnnness = min(squish_nnnness)
@@ -201,15 +248,18 @@ def calc_lambda_squish(unit_cell: Atoms, squish_nnnness: list, max_exact_distanc
             # dont do isotopes for now
             assert MDecoherenceAtom.nucleon_properties[symbol]["abundance"] == 1
 
-            lambda_contribution = I * (I + 1) * gyromagnetic_ratio ** 2 / (distance_from_muon ** 6)
-            non_squish_variance_contribution += lambda_contribution
+            this_nuclear_magnetic_factor = I * (I + 1) * gyromagnetic_ratio ** 2
+            lambda_contribution = this_nuclear_magnetic_factor / (distance_from_muon ** 6)
             if current_nnnness in squish_nnnness:
                 squish_variance_contribution += lambda_contribution
+                nuclear_magnetic_factor += this_nuclear_magnetic_factor
+            else:
+                non_squish_variance_contribution += lambda_contribution
+
 
     # add on the integral to deal with everything up to infinity
     cell_density = supercell.get_number_of_atoms() / supercell.get_volume()
     integral_contribution = (4 * np.pi / 3) * 1 / (max_exact_distance ** 6) * cell_density
     non_squish_variance_contribution += integral_contribution
 
-    # find lambda_squish
-    return (squish_variance_contribution / non_squish_variance_contribution) ** (1 / 6)
+    return squish_variance_contribution, non_squish_variance_contribution, nuclear_magnetic_factor
