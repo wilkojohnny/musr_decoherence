@@ -6,7 +6,7 @@ import scipy.sparse as sparse  # for sparse matrices
 
 
 # make measurement operator for this spin
-def measure_ith_spin(Spins, i, pauli_matrix):
+def measure_ith_spin(Spins, i, pauli_matrix, sparse_format='csc'):
     # calculate the dimension of the identity matrix on the LHS ...
     lhs_dim = 1
     for i_spin in range(0, i):
@@ -17,25 +17,27 @@ def measure_ith_spin(Spins, i, pauli_matrix):
     for i_spin in range(i + 1, len(Spins)):
         rhs_dim = rhs_dim * Spins[i_spin].pauli_dimension
 
-    return sparse.kron(sparse.kron(sparse.identity(lhs_dim), pauli_matrix), sparse.identity(rhs_dim))
+    return sparse.kron(sparse.kron(sparse.identity(lhs_dim), pauli_matrix, format=sparse_format)
+                       , sparse.identity(rhs_dim, format=sparse_format)
+                       , format=sparse_format)
 
 
 # calculate the Hamiltonian for the i j pair
-def calc_hamiltonian_term(spins, i, j):
+def calc_hamiltonian_term(spins, i, j, sparse_format='csc'):
     # calculate A
     A = 1.05456e-5 * spins[i].gyromag_ratio * spins[j].gyromag_ratio
 
     r = spins[i].position - spins[j].position
 
     # get all the operators we need
-    i_x = measure_ith_spin(spins, i, spins[i].pauli_x)
-    j_x = measure_ith_spin(spins, j, spins[j].pauli_x)
+    i_x = measure_ith_spin(spins, i, spins[i].pauli_x, sparse_format=sparse_format)
+    j_x = measure_ith_spin(spins, j, spins[j].pauli_x, sparse_format=sparse_format)
 
-    i_y = measure_ith_spin(spins, i, spins[i].pauli_y)
-    j_y = measure_ith_spin(spins, j, spins[j].pauli_y)
+    i_y = measure_ith_spin(spins, i, spins[i].pauli_y, sparse_format=sparse_format)
+    j_y = measure_ith_spin(spins, j, spins[j].pauli_y, sparse_format=sparse_format)
 
-    i_z = measure_ith_spin(spins, i, spins[i].pauli_z)
-    j_z = measure_ith_spin(spins, j, spins[j].pauli_z)
+    i_z = measure_ith_spin(spins, i, spins[i].pauli_z, sparse_format=sparse_format)
+    j_z = measure_ith_spin(spins, j, spins[j].pauli_z, sparse_format=sparse_format)
 
     # Calculate the hamiltonian!
     return A / pow(abs(r.r()), 3) * (i_x * j_x + i_y * j_y + i_z * j_z
@@ -43,7 +45,7 @@ def calc_hamiltonian_term(spins, i, j):
                                      * (j_x * r.xhat() + j_y * r.yhat() + j_z * r.zhat()))
 
 
-def calc_dipolar_hamiltonian(spins, just_muon_interactions=False):
+def calc_dipolar_hamiltonian(spins, just_muon_interactions=False, sparse_format='csc'):
     current_hamiltonian = 0
 
     # if just muon interaction, then only do interactions between i=0 and all j
@@ -55,7 +57,8 @@ def calc_dipolar_hamiltonian(spins, just_muon_interactions=False):
     # calculate hamiltonian for each pair and add onto sum
     for i in range(0, i_max):
         for j in range(i + 1, len(spins)):
-            current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j)
+            current_hamiltonian = current_hamiltonian + calc_hamiltonian_term(spins, i, j, sparse_format=sparse_format)
+
     return current_hamiltonian
 
 

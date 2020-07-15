@@ -53,8 +53,8 @@ def fit_function(params, x):
     muon, All_spins = AO.get_linear_fmuf_atoms(ase_atoms=CaF2_atoms, muon_position=muon_position,
                                                nnnness=4, squish_radii=squish_radii, lambda_squish=lambda_squish)
 
-    deco = DipolarPolarisation.calc_decoherence(all_spins=All_spins, muon=muon, muon_sample_polarisation=None, times=x,
-                                                  plot=False, shutup=True)
+    deco = DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=None, times=x,
+                                                         plot=False, shutup=True)
 
     return A*deco + A0*np.ones(len(x))
 

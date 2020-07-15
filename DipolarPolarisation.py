@@ -73,11 +73,11 @@ def inc_isotope_id(basis, oldids=None):
         return oldids
 
 
-def calc_decoherence(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
-                     times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
-                     # other arguments
-                     fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
-                     plot: bool = False, shutup: bool =False):
+def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
+                              times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
+                              # other arguments
+                              fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
+                              plot: bool = False, shutup: bool =False):
     '''
     :param all_spins: array of the spins
     :param muon:
