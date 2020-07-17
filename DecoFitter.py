@@ -2,8 +2,12 @@
 
 # load modules
 import numpy as np  # for numpy arrays
-import matplotlib.pyplot as pyplot  # for plotting
-import matplotlib.colors as color  # for colourful plots
+try:
+	import matplotlib.pyplot as pyplot  # for plotting
+	import matplotlib.colors as color  # for colourful plots
+except ModuleNotFoundError:
+	no_plot = True
+
 from lmfit import *  # for nls curve fitting
 
 
