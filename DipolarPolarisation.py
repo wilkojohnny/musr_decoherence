@@ -10,7 +10,11 @@ import time as human_time
 import TCoord3D as coord  # coordinate utilities
 import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
-import matplotlib.pyplot as pyplot  # plotting
+no_plot = False
+try:
+	import matplotlib.pyplot as pyplot  # plotting
+except ModuleNotFoundError:
+	no_plot = True
 import os  #
 
 
