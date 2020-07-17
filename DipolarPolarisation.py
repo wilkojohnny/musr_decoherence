@@ -10,7 +10,6 @@ import time as human_time
 import TCoord3D as coord  # coordinate utilities
 import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
-import matplotlib.pyplot as pyplot  # plotting
 import os  #
 
 
@@ -77,7 +76,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                               times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
                               # other arguments
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
-                              plot: bool = False, shutup: bool =False):
+                              plot: bool = False, shutup: bool =False, gpu=False):
     '''
     :param all_spins: array of the spins
     :param muon:
@@ -95,6 +94,20 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     if not shutup:
         for atom in all_spins:
             print(atom)
+
+    if plot:
+        try:
+            import matplotlib.pyplot as pyplot  # plotting
+        except ModuleNotFoundError:
+            print('Can\'t find MatPlotLib. Not plotting.')
+            plot = False
+
+    if gpu:
+        try:
+            import cupy as cp
+        except ModuleNotFoundError:
+            print('Can\'t find CuPy module. Switching to non-GPU mode.')
+            gpu = False
 
     # type of calculation - can't do fourier2d if not fourier
     fourier_2d = fourier_2d and fourier
