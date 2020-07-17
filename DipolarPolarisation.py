@@ -12,9 +12,9 @@ import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 no_plot = False
 try:
-	import matplotlib.pyplot as pyplot  # plotting
+    import matplotlib.pyplot as pyplot  # plotting
 except ModuleNotFoundError:
-	no_plot = True
+    no_plot = True
 import os  #
 
 
@@ -26,7 +26,11 @@ def decoherence_file_preamble(file, nn_atoms, muon, fourier, starttime=None, end
 
     # get the git version
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    version_label = subprocess.check_output(["git", "describe", "--always"], cwd=script_dir).strip()
+    try:
+        version_label = subprocess.check_output(["git", "describe", "--always"], cwd=script_dir).strip()
+    except subprocess.CalledProcessError:
+        version_label = '(version not available)'
+
     file.writelines('! Using version ' + str(version_label) + '\n!\n')
 
     # type of calculation
@@ -81,7 +85,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                               times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
                               # other arguments
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
-                              plot: bool = False, shutup: bool =False):
+                              plot: bool = False, shutup: bool = False, gpu: bool = False):
     '''
     :param all_spins: array of the spins
     :param muon:
@@ -93,12 +97,28 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     :param tol:
     :param plot:
     :param shutup:
+    :param gpu: use GPU (requires cupy)
     :return:
     '''
 
     if not shutup:
         for atom in all_spins:
             print(atom)
+
+    old_gpu = True
+
+    if gpu:
+        try:
+            import cupy as cp
+            if int(cp.cuda.device.Device(0).compute_capability) >= 30:
+                print('💰 Rich user detected. Will use the GPU to its full potential.')
+                old_gpu = False
+            else:
+                print('👴🏻 Grandpa-GPU mode activated. Will only utilise basic GPU optimisation.')
+                old_gpu = True
+        except ModuleNotFoundError:
+            print('Can\'t find CuPy module. Have you set up CUDA?')
+            gpu = False
 
     # type of calculation - can't do fourier2d if not fourier
     fourier_2d = fourier_2d and fourier
@@ -147,11 +167,26 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         if not shutup:
             print("Finding eigenvalues...")
         dense_hamiltonian = hamiltonian.todense()
-        this_E, R = linalg.eigh(dense_hamiltonian)
-        Rinv = R.H
+        if gpu:
+            dense_hamiltonian = cp.array(dense_hamiltonian)
+            this_E, R = cp.linalg.eigh(dense_hamiltonian)
+            Rinv = cp.conj(R).transpose()
+        else:
+            this_E, R = linalg.eigh(dense_hamiltonian)
+            Rinv = R.H
         if not shutup:
             print("Found eigenvalues:")
             print(this_E)
+
+        # now upload the muon spin matrices to the GPU (making them sparse if possible)
+        if gpu and not old_gpu:
+            muon_spin_x = cp.sparse.csr_matrix(muon_spin_x)
+            muon_spin_y = cp.sparse.csr_matrix(muon_spin_y)
+            muon_spin_z = cp.sparse.csr_matrix(muon_spin_z)
+        elif gpu and old_gpu:
+            muon_spin_x = cp.array(muon_spin_x.todense())
+            muon_spin_y = cp.array(muon_spin_y.todense())
+            muon_spin_z = cp.array(muon_spin_z.todense())
 
         # Calculate constant (lab book 1 page 105)
         thisconst = 0

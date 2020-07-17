@@ -6,7 +6,7 @@ import scipy.sparse as sparse  # for sparse matrices
 
 
 # make measurement operator for this spin
-def measure_ith_spin(Spins, i, pauli_matrix, sparse_format='csc'):
+def measure_ith_spin(Spins, i, pauli_matrix, sparse_format='csr'):
     # calculate the dimension of the identity matrix on the LHS ...
     lhs_dim = 1
     for i_spin in range(0, i):
@@ -23,7 +23,7 @@ def measure_ith_spin(Spins, i, pauli_matrix, sparse_format='csc'):
 
 
 # calculate the Hamiltonian for the i j pair
-def calc_hamiltonian_term(spins, i, j, sparse_format='csc'):
+def calc_hamiltonian_term(spins, i, j, sparse_format='csr'):
     # calculate A
     A = 1.05456e-5 * spins[i].gyromag_ratio * spins[j].gyromag_ratio
 
@@ -45,7 +45,7 @@ def calc_hamiltonian_term(spins, i, j, sparse_format='csc'):
                                      * (j_x * r.xhat() + j_y * r.yhat() + j_z * r.zhat()))
 
 
-def calc_dipolar_hamiltonian(spins, just_muon_interactions=False, sparse_format='csc'):
+def calc_dipolar_hamiltonian(spins, just_muon_interactions=False, sparse_format='csr'):
     current_hamiltonian = 0
 
     # if just muon interaction, then only do interactions between i=0 and all j
