@@ -6,7 +6,7 @@ import scipy.sparse as sparse  # for sparse matrices
 
 
 # make measurement operator for this spin
-def measure_ith_spin(Spins, i, pauli_matrix, sparse_format='csr'):
+def measure_ith_spin(Spins, i, pauli_matrix, sparse_format='csr', gpu=False):
     # calculate the dimension of the identity matrix on the LHS ...
     lhs_dim = 1
     for i_spin in range(0, i):

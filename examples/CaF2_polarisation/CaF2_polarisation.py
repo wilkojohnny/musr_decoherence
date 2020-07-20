@@ -49,7 +49,7 @@ def main():
     muon_sample_polarisation = None
 
     DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=muon_sample_polarisation,
-                                                  plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=True,
+                                                  plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=False,
                                                   times=np.arange(0, 20, 0.1), outfile_location=output_file_name)
     return 0
 

@@ -116,7 +116,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             else:
                 print('👴🏻 Grandpa-GPU mode activated. Will only utilise basic GPU optimisation.')
                 old_gpu = True
-        except ModuleNotFoundError:
+        except ImportError:
             print('Can\'t find CuPy module. Have you set up CUDA?')
             gpu = False
 
@@ -150,6 +150,10 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             Spins.append(all_spins[atomid][current_isotope_ids[atomid]])
             probability = probability * all_spins[atomid][current_isotope_ids[atomid]].abundance
 
+        hilbert_dim = 1
+        for spin in Spins:
+            hilbert_dim *= spin.II + 1
+
         # create measurement operators for the muon's spin
         muon_spin_x = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
         muon_spin_y = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
@@ -168,7 +172,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             print("Finding eigenvalues...")
         dense_hamiltonian = hamiltonian.todense()
         if gpu:
-            dense_hamiltonian = cp.array(dense_hamiltonian)
+            dense_hamiltonian = cp.array(dense_hamiltonian, dtype='csingle')
             this_E, R = cp.linalg.eigh(dense_hamiltonian)
             Rinv = cp.conj(R).transpose()
         else:
@@ -180,43 +184,45 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         # now upload the muon spin matrices to the GPU (making them sparse if possible)
         if gpu and not old_gpu:
-            muon_spin_x = cp.sparse.csr_matrix(muon_spin_x)
-            muon_spin_y = cp.sparse.csr_matrix(muon_spin_y)
-            muon_spin_z = cp.sparse.csr_matrix(muon_spin_z)
+            muon_spin_x = cp.sparse.csr_matrix(muon_spin_x, dtype='csingle')
+            muon_spin_y = cp.sparse.csr_matrix(muon_spin_y, dtype='csingle')
+            muon_spin_z = cp.sparse.csr_matrix(muon_spin_z, dtype='csingle')
         elif gpu and old_gpu:
-            muon_spin_x = cp.array(muon_spin_x.todense())
-            muon_spin_y = cp.array(muon_spin_y.todense())
-            muon_spin_z = cp.array(muon_spin_z.todense())
+            muon_spin_x = cp.array(muon_spin_x.todense(), dtype='csingle')
+            muon_spin_y = cp.array(muon_spin_y.todense(), dtype='csingle')
+            muon_spin_z = cp.array(muon_spin_z.todense(), dtype='csingle')
+
+        # weights -- if single crystal, use that; otherwise use 1/sqrt(3) for each
+        wx, wy, wz = (1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3))
+        if muon_sample_polarisation is not None:
+            wx, wy, wz = muon_sample_polarisation.totuple()
 
         # Calculate constant (lab book 1 page 105)
         thisconst = 0
-        if muon_sample_polarisation is None:
-            for i in range(0, len(R)):
-                    # angular average mode
-                    thisconst = thisconst + pow(abs(Rinv[i] * muon_spin_x * R[:, i]), 2) \
-                                + pow(abs(Rinv[i] * muon_spin_y * R[:, i]), 2) \
-                                + pow(abs(Rinv[i] * muon_spin_z * R[:, i]), 2)
-            const = const + probability * thisconst / (6 * (muon_spin_x.shape[0] / 2))
-        else:
-            for i in range(0, len(R)):
-                # single crystal sample
-                thisconst = thisconst + \
-                            pow(abs(Rinv[i] * muon_sample_polarisation.ortho_x * muon_spin_x * R[:, i]), 2) \
-                            + pow(abs(Rinv[i] * muon_sample_polarisation.ortho_y * muon_spin_y * R[:, i]), 2) \
-                            + pow(abs(Rinv[i] * muon_sample_polarisation.ortho_z * muon_spin_z * R[:, i]), 2)
-            const = const + probability * thisconst / (2 * (muon_spin_x.shape[0] / 2))
+        for i in range(0, len(R)):
+            if gpu:
+                sx = cp.matmul(Rinv[i], cp.matmul(muon_spin_x, R[:, i]))
+                sy = cp.matmul(Rinv[i], cp.matmul(muon_spin_y, R[:, i]))
+                sz = cp.matmul(Rinv[i], cp.matmul(muon_spin_z, R[:, i]))
+            else:
+                sx = Rinv[i] * muon_spin_x * R[:, i]
+                sy = Rinv[i] * muon_spin_y * R[:, i]
+                sz = Rinv[i] * muon_spin_z * R[:, i]
+            # angular average mode
+            thisconst = thisconst + pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)
+        const = const + probability * thisconst / (2 * (hilbert_dim / 2))
 
         # now calculate oscillating term
         this_amplitude = np.zeros((len(R), len(R)))
         for i in range(0, len(R)):
-            if muon_sample_polarisation is None:
+            if gpu:
+                Rx = cp.matmul(Rinv[i], muon_spin_x)
+                Ry = cp.matmul(Rinv[i], muon_spin_y)
+                Rz = cp.matmul(Rinv[i], muon_spin_z)
+            else:
                 Rx = Rinv[i] * muon_spin_x
                 Ry = Rinv[i] * muon_spin_y
                 Rz = Rinv[i] * muon_spin_z
-            else:
-                Rx = Rinv[i] * muon_spin_x * muon_sample_polarisation.ortho_x
-                Ry = Rinv[i] * muon_spin_y * muon_sample_polarisation.ortho_y
-                Rz = Rinv[i] * muon_spin_z * muon_sample_polarisation.ortho_z
 
             if not shutup:
                 print(str(100 * i / len(R)) + '% complete...')
@@ -225,18 +231,17 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             else:
                 jmin = i + 1
             for j in range(jmin, len(R)):
-                if muon_sample_polarisation is None:
-                    # do angular averaging
-                    this_amplitude[i][j] = (pow(abs(Rx * R[:, j]), 2)
-                                            + pow(abs(Ry * R[:, j]), 2)
-                                            + pow(abs(Rz * R[:, j]), 2)) * probability \
-                                           / (3 * (muon_spin_x.shape[0] / 2))
+                if gpu:
+                    sx = cp.matmul(Rx, R[:, j])
+                    sy = cp.matmul(Ry, R[:, j])
+                    sz = cp.matmul(Rz, R[:, j])
                 else:
-                    # single crystal sample
-                    this_amplitude[i][j] = (pow(abs(Rx * R[:, j]), 2)
-                                            + pow(abs(Ry * R[:, j]), 2)
-                                            + pow(abs(Rz * R[:, j]), 2)) * probability \
-                                           / (muon_spin_x.shape[0] / 2)
+                    sx = Rx * R[:, j]
+                    sy = Ry * R[:, j]
+                    sz = Rz * R[:, j]
+                # do angular averaging
+                this_amplitude[i][j] = (pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)) \
+                                       * probability / (hilbert_dim / 2)
 
         amplitude.append(this_amplitude.tolist())
         E.append(this_E.tolist())
