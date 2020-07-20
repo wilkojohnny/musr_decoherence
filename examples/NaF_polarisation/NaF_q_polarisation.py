@@ -1,5 +1,15 @@
 # NaF_nnn_polarisation.py -- calculate muon polarisation function for F-mu-F states
 
+import functools
+print = functools.partial(print, flush=True)
+
+# add DecoCalc to PATH
+import os
+pwd = os.path.dirname(__file__)
+deco_path = os.path.join(pwd, '../../')  # this should be the path of Decoherence_calculator
+import sys
+sys.path.append(deco_path)
+
 import DipolarPolarisation
 import DecoherenceCalculator
 from MDecoherenceAtom import TDecoherenceAtom as atom
