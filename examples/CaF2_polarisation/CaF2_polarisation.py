@@ -1,6 +1,9 @@
 # Plot muon polarisation of CaF2
 # works with Decoherence_calculator version>ff1a392386b66178c63dbe80dbfe6e7c5b935286
 
+import functools
+print = functools.partial(print, flush=True)
+
 # add DecoCalc to PATH
 import os
 pwd = os.path.dirname(__file__)

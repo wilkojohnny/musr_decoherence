@@ -2,6 +2,9 @@
 # spins (in the style of F--\mu--F)
 # John Wilkinson 15/11/19
 
+import functools
+print = functools.partial(print, flush=True)
+
 import subprocess  # gets git version
 from datetime import datetime  # allows one to print out date and time
 import DecoherenceCalculator as decoCalc  # allows one to calculate decoherence
