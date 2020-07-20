@@ -204,7 +204,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         thisconst = 0
         for i in range(0, len(R)):
             if gpu:
-                sx = cp.matmul(Rinv[i], cp.matmul(muon_spin_x, R[:, i]))
+                sx = cp.matmul(Rinv[i], muon_spin_x.dot(R[:, i]))
                 sy = cp.matmul(Rinv[i], cp.matmul(muon_spin_y, R[:, i]))
                 sz = cp.matmul(Rinv[i], cp.matmul(muon_spin_z, R[:, i]))
             else:
