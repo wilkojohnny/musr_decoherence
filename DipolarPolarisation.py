@@ -205,8 +205,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         for i in range(0, len(R)):
             if gpu:
                 sx = cp.matmul(Rinv[i], muon_spin_x.dot(R[:, i]))
-                sy = cp.matmul(Rinv[i], cp.matmul(muon_spin_y, R[:, i]))
-                sz = cp.matmul(Rinv[i], cp.matmul(muon_spin_z, R[:, i]))
+                sy = cp.matmul(Rinv[i], muon_spin_y.dot(R[:, i]))
+                sz = cp.matmul(Rinv[i], muon_spin_z.dot(R[:, i]))
             else:
                 sx = Rinv[i] * muon_spin_x * R[:, i]
                 sy = Rinv[i] * muon_spin_y * R[:, i]
@@ -219,9 +219,12 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         this_amplitude = np.zeros((len(R), len(R)))
         for i in range(0, len(R)):
             if gpu:
-                Rx = cp.matmul(Rinv[i], muon_spin_x)
-                Ry = cp.matmul(Rinv[i], muon_spin_y)
-                Rz = cp.matmul(Rinv[i], muon_spin_z)
+                Rx = muon_spin_x.dot(R[:, i])
+                Ry = muon_spin_y.dot(R[:, i])
+                Rz = muon_spin_z.dot(R[:, i])
+                # Rx = cp.matmul(Rinv[i], muon_spin_x)
+                # Ry = cp.matmul(Rinv[i], muon_spin_y)
+                # Rz = cp.matmul(Rinv[i], muon_spin_z)
             else:
                 Rx = Rinv[i] * muon_spin_x
                 Ry = Rinv[i] * muon_spin_y
@@ -235,9 +238,12 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 jmin = i + 1
             for j in range(jmin, len(R)):
                 if gpu:
-                    sx = cp.matmul(Rx, R[:, j])
-                    sy = cp.matmul(Ry, R[:, j])
-                    sz = cp.matmul(Rz, R[:, j])
+                    sx = cp.matmul(Rinv[j], Rx)
+                    sy = cp.matmul(Rinv[j], Ry)
+                    sz = cp.matmul(Rinv[j], Rz)
+                    # sx = cp.matmul(Rx, R[:, j])
+                    # sy = cp.matmul(Ry, R[:, j])
+                    # sz = cp.matmul(Rz, R[:, j])
                 else:
                     sx = Rx * R[:, j]
                     sy = Ry * R[:, j]
