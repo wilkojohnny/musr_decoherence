@@ -45,8 +45,8 @@ def main():
     # file name
     output_file_name = 'NaF_polarisation.dat'
 
-    DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, times=np.arange(0, 20, 0.1), plot=True,
-                                                  outfile_location=output_file_name, do_quadrupoles=True, gpu=False)
+    DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, times=np.arange(0, 10, 0.1), plot=True,
+                                                  outfile_location=output_file_name, do_quadrupoles=True, gpu=True)
 
     return 0
 

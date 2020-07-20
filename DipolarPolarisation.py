@@ -354,11 +354,21 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         P_average = []
 
         # calculate each time separately
-        for time in np.nditer(times):
-            if not shutup:
-                print("t=" + str(time))
-            P_average.append(decoCalc.calc_p_average_t(time, const, amplitude, E).max())
-            # print(P_average[-1])
+        if not gpu:
+            for time in np.nditer(times):
+                if not shutup:
+                    print("t=" + str(time))
+                P_average.append(decoCalc.calc_p_average_t(time, const, amplitude, E).max())
+        else:
+            kernel_innard = decoCalc.write_gpu_kernel_innard(const, amplitude, E)
+            p_average_kernel = cp.ElementwiseKernel('float32 t', 'float32 p', kernel_innard, 'p_average_kernel')
+            print('written kernel')
+            t = cp.array(times, dtype='float32')
+            print('uploaded times')
+            p_kernel = p_average_kernel(t)
+            print('done calculation')
+            P_average = cp.asnumpy(p_kernel)
+            print('ran calculation')
 
         if not shutup:
             print("elapsed time: " + str(human_time.time() - start_time))
