@@ -11,7 +11,6 @@ import sys
 sys.path.append(deco_path)
 
 import DipolarPolarisation
-import DecoherenceCalculator
 from MDecoherenceAtom import TDecoherenceAtom as atom
 from TCoord3D import TCoord3D as coord
 import numpy as np

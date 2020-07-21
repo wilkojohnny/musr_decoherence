@@ -7,7 +7,8 @@ print = functools.partial(print, flush=True)
 
 import subprocess  # gets git version
 from datetime import datetime  # allows one to print out date and time
-import DecoherenceCalculator as decoCalc  # allows one to calculate decoherence
+import Hamiltonians # allows one to calculate Hamiltonians
+import TimeDependence
 from MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
 import time as human_time
 import TCoord3D as coord  # coordinate utilities
@@ -158,17 +159,17 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             hilbert_dim *= spin.II + 1
 
         # create measurement operators for the muon's spin
-        muon_spin_x = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
-        muon_spin_y = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
-        muon_spin_z = 2*decoCalc.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
+        muon_spin_x = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
+        muon_spin_y = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
+        muon_spin_z = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
 
         start_time = human_time.time()
 
         # calculate hamiltonian
-        hamiltonian = decoCalc.calc_dipolar_hamiltonian(Spins, just_muon_interactions=just_muon_interactions)
+        hamiltonian = Hamiltonians.calc_dipolar_hamiltonian(Spins, just_muon_interactions=just_muon_interactions)
 
         if do_quadrupoles:
-            hamiltonian += decoCalc.calc_quadrupolar_hamiltonian(Spins)
+            hamiltonian += Hamiltonians.calc_quadrupolar_hamiltonian(Spins)
 
         # find eigenvalues and eigenvectors of hamiltonian
         if not shutup:
@@ -358,17 +359,21 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             for time in np.nditer(times):
                 if not shutup:
                     print("t=" + str(time))
-                P_average.append(decoCalc.calc_p_average_t(time, const, amplitude, E).max())
+                P_average.append(TimeDependence.calc_p_average_t(time, const, amplitude, E).max())
         else:
-            kernel_innard = decoCalc.write_gpu_kernel_innard(const, amplitude, E)
-            p_average_kernel = cp.ElementwiseKernel('float32 t', 'float32 p', kernel_innard, 'p_average_kernel')
-            print('written kernel')
-            t = cp.array(times, dtype='float32')
-            print('uploaded times')
-            p_kernel = p_average_kernel(t)
-            print('done calculation')
-            P_average = cp.asnumpy(p_kernel)
-            print('ran calculation')
+            # calculate the differences E[i]-E[j] and put into matrix on the GPU
+            E_diff_device = TimeDependence.calc_outer_differences_gpu(E[0])
+
+            # now upload the amplitudes onto the device
+            amplitude_device = cp.asarray(amplitude[0], dtype='float32')
+
+            for time in times:
+                if not shutup:
+                    print("t=" + str(time))
+                P_average.append(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
+                                                                          amplitude_device,
+                                                                          len(E[0]),
+                                                                          time) + const)
 
         if not shutup:
             print("elapsed time: " + str(human_time.time() - start_time))

@@ -1,4 +1,4 @@
-# DecoherenceCalculator.py - Calculate decoherence of muon state in any lattice with any structure
+# Hamiltonians.py - Calculate decoherence of muon state in any lattice with any structure
 
 from __future__ import division
 from __future__ import absolute_import

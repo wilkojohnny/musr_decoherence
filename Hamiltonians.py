@@ -1,4 +1,4 @@
-# DecoherenceCalculator.py - Calculate decoherence of muon state in any lattice with any structure
+# Hamiltonians.py - Calculate decoherence of muon state in any lattice with any structure
 
 import TCoord3D as coord  # 3D coordinates class
 import numpy as np  # for matrices
@@ -131,40 +131,3 @@ def calc_zeeman_hamiltonian(spins, field: coord.TCoord3D):
                                                                               + field.ortho_y * Sy
                                                                               + field.ortho_z * Sz)
     return current_hamiltonian
-
-
-# calculate polarisation function for one specific time (used in the integration routine)
-def calc_p_average_t(t, const, amplitude, E):
-    # calculate the oscillating term
-    osc_term = 0
-    for isotope_combination in range(0, len(amplitude)):
-        for i in range(0, len(E[isotope_combination])):
-            for j in range(i + 1, len(E[isotope_combination])):
-                osc_term = osc_term + amplitude[isotope_combination][i][j] * np.cos((E[isotope_combination][i]
-                                                                                     - E[isotope_combination][j]) * t)
-
-    # add on the constant, and return, and divide by the size of the space
-    return const + osc_term
-
-
-def write_gpu_kernel_innard(const : float, amplitude : list, E: list) -> str:
-    """
-    writes out the string of the GPU kernel to calculate the equation of the polarisation
-    :param const: constant term
-    :param amplitude: 2-D list, where amplitude[i][j] is the amplitude of cos{(E[i]-E[j])t}
-    :return string of the Elementwise kernel (see CuPy Documentation for usage instructions)
-    """
-
-    output_string = 'p = ' + str(const)
-    for isotope_combination in range(0, len(amplitude)):
-        for i in range(0, len(E[isotope_combination])):
-            for j in range(i + 1, len(E[isotope_combination])):
-                if E[isotope_combination][j] < 0:
-                    sign = '+'
-                else:
-                    sign = '-'
-                output_string = output_string + ' + ' + str("%.5f" % amplitude[isotope_combination][i][j]) + \
-                                                        '*cos((' + str("%.5f" % E[isotope_combination][i]) + sign + \
-                                                        str("%.5f" % abs(E[isotope_combination][j])) + ')*t)'
-
-    return output_string
