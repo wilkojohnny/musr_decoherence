@@ -171,6 +171,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         if do_quadrupoles:
             hamiltonian += Hamiltonians.calc_quadrupolar_hamiltonian(Spins)
 
+        del Spins
+
         # find eigenvalues and eigenvectors of hamiltonian
         if not shutup:
             print("Finding eigenvalues...")

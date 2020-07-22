@@ -192,6 +192,12 @@ nucleon_properties = {
            "charge": +1,
            "anti_shielding": 4
            },
+    "Al": {"II": 5,
+           "gyromag_ratio": 69.706,
+           "abundance": 1,
+           "Q": 0.149,
+           "charge": +3,
+           "anti_shielding": 2.3}
     "Sc": {"II": 7,
            "gyromag_ratio": 64.9895,
            "abundance": 1,
