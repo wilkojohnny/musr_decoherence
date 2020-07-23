@@ -106,8 +106,6 @@ def calc_oscillating_term_gpu(E_diff_gpu, A_gpu, size, t):
     osc_kernel = cp.RawKernel(r'''
     extern "C"__global__
     void osc_kernel(float *Amp, float *EDiff, int N, double t, float *p) {
-       __shared__ float shrA [''' + str(threads_per_block) + '''];
-       __shared__ float shrB [''' + str(threads_per_block) + '''];
 
        int y, x, i, j;
 
