@@ -118,7 +118,10 @@ def calc_oscillating_term_gpu(E_diff_gpu, A_gpu, size, t):
        
        if (i<j) {
             p[i*N + j] = Amp[i*N+j]*cosf(EDiff[i*N+j]*t);
+       } else if (i=j) {
+            p[i*N + j] = 0.5*Amp[i*N+j];
        }
+        
     }
     ''', 'osc_kernel')
 
