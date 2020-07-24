@@ -174,6 +174,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         if gpu:
             dense_hamiltonian = cp.array(dense_hamiltonian, dtype='csingle')
             this_E, R = cp.linalg.eigh(dense_hamiltonian)
+            del dense_hamiltonian
             Rinv = R.transpose().conj()
         else:
             this_E, R = linalg.eigh(dense_hamiltonian)
@@ -193,16 +194,12 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         if not gpu:
             for i in range(0, len(R)):
-                if gpu:
-                    R_swap = cp.concatenate((R[i][int(hilbert_dim/2):hilbert_dim], R[i][0:int(hilbert_dim/2)]))
-                    (sx, sy, sz) = calc_amplitudes_gpu(R[i], Rinv[i], R_swap, size=hilbert_dim)
-                else:
-                    Rx = Rinv[i] * muon_spin_x
-                    Ry = Rinv[i] * muon_spin_y
-                    Rz = Rinv[i] * muon_spin_z
-                    sx = Rx * R[:, i]
-                    sy = Ry * R[:, i]
-                    sz = Rz * R[:, i]
+                Rx = Rinv[i] * muon_spin_x
+                Ry = Rinv[i] * muon_spin_y
+                Rz = Rinv[i] * muon_spin_z
+                sx = Rx * R[:, i]
+                sy = Ry * R[:, i]
+                sz = Rz * R[:, i]
                 # angular average mode
                 thisconst = thisconst + pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)
 
@@ -213,12 +210,9 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 else:
                     jmin = i + 1
                 for j in range(jmin, len(R)):
-                    if gpu:
-                        (sx, sy, sz) = calc_amplitudes_gpu(R[i], Rinv[j], R_swap, hilbert_dim)
-                    else:
-                        sx = Rx * R[:, j]
-                        sy = Ry * R[:, j]
-                        sz = Rz * R[:, j]
+                    sx = Rx * R[:, j]
+                    sy = Ry * R[:, j]
+                    sz = Rz * R[:, j]
                     # do angular averaging
                     this_amplitude[i][j] = (pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)) \
                                             * probability / (hilbert_dim / 2)
@@ -441,6 +435,8 @@ def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
     a = 1 / (size/2) * (mod_squared(cp.matmul(Rinv, R_x))*weights[0]**2 +
                         mod_squared(cp.matmul(Rinv, R_y))*weights[1]**2 +
                         mod_squared(cp.matmul(Rinv, R_z))*weights[2]**2)
+
+    del R, Rinv, R_x, R_y, R_z, R_roll
 
     return a
 
