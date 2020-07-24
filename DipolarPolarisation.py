@@ -376,6 +376,12 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             pyplot.ylabel('Muon Polarisation')
             pyplot.show()
 
+        if gpu:
+            mempool = cp.get_default_memory_pool()
+            pinned_mempool = cp.get_default_pinned_memory_pool()
+            mempool.free_all_blocks()
+            pinned_mempool.free_all_blocks()
+
         return np.array(P_average)
 
 
