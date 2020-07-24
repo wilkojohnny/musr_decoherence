@@ -343,10 +343,12 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             for time in times:
                 if not shutup:
                     print("t=" + str(time))
-                P_average.append(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
+                P_average.append(cp.asnumpy(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
                                                                           amplitude_device,
                                                                           len(E[0]),
-                                                                          time) + const)
+                                                                          time)).max())
+            del E_diff_device
+            del amplitude_device
 
         if not shutup:
             print("elapsed time: " + str(human_time.time() - start_time))
