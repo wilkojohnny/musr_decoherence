@@ -16,7 +16,7 @@ except ModuleNotFoundError:
 from lmfit import *  # for nls curve fitting
 
 
-def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, end_time=None, just_plot=False):
+def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, start_time=None, end_time=None, just_plot=False):
     """
     :param data_file_location: location of the muon data file
     :param fit_function: function to be fitted
@@ -31,7 +31,7 @@ def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, e
         return params
 
     # load in the data (expect it of the form x y yerr)
-    x, y, y_error = load_muon_data(data_file_location, end_time=end_time)
+    x, y, y_error = load_muon_data(data_file_location, start_time=start_time, end_time=end_time)
 
     fitted_params = params
 
@@ -88,8 +88,11 @@ def residual(params, fit_function, x, y, yerr):
     return (y - y_func) / yerr
 
 
-def load_muon_data(filename: str, end_time=None, encoding='iso-8859-1'):
+def load_muon_data(filename: str, start_time=None, end_time=None, encoding='iso-8859-1'):
     # loads muon data, spits it out as three numpy arrays: x, y, yerr
+
+    if start_time is None:
+        start_time = 0
 
     # open the file
     data_file = open(filename, 'r', encoding=encoding)
@@ -106,6 +109,8 @@ def load_muon_data(filename: str, end_time=None, encoding='iso-8859-1'):
             split_line = line.split()
             # put these into the arrays
             this_x = float(split_line[0])
+            if this_x < start_time:
+                continue
             this_y = float(split_line[1])
             this_yerror = float(split_line[2])
             if end_time is not None:
