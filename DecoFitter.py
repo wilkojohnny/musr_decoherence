@@ -1,6 +1,11 @@
 # DecoFitter.py - fits experimental musr data to that calculated by DecoherenceCalculator
 
 # load modules
+
+# flush printing cache (useful for ARC)
+import functools
+print = functools.partial(print, flush=True)
+
 import numpy as np  # for numpy arrays
 try:
 	import matplotlib.pyplot as pyplot  # for plotting
