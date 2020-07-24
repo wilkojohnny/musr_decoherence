@@ -127,4 +127,4 @@ def calc_oscillating_term_gpu(E_diff_gpu, A_gpu, size, t):
 
     osc_kernel((blocks, blocks), (threads_per_block, threads_per_block), (A_gpu, E_diff_gpu, size, t, p))
 
-    return cp.sum(cp.sum(p))
+    return cp.asnumpy(cp.sum(cp.sum(p))).max()

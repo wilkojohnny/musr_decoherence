@@ -225,9 +225,10 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
             this_amplitude = calc_amplitudes_gpu(R, Rinv, R_roll, (wx, wy, wz), hilbert_dim)
 
+            del R, Rinv, R_roll
+
             amplitude.append(this_amplitude)
             E.append(this_E)
-
 
         # increment the isotope ids
         current_isotope_ids = inc_isotope_id(basis=number_isotopes, oldids=current_isotope_ids)
@@ -343,12 +344,14 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             for time in times:
                 if not shutup:
                     print("t=" + str(time))
-                P_average.append(cp.asnumpy(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
+                P_average.append(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
                                                                           amplitude_device,
                                                                           len(E[0]),
-                                                                          time)).max())
+                                                                          time))
             del E_diff_device
             del amplitude_device
+            del amplitude
+            del E
 
         if not shutup:
             print("elapsed time: " + str(human_time.time() - start_time))
