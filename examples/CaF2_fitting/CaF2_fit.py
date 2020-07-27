@@ -27,18 +27,23 @@ CaF2_atoms = build.make_supercell(CaF2_atoms, np.diag([2,1,1]))
 # get the muon position visually -- to do this, CTRL+click the two F atoms the
 # muon sits between. (right click+drag to orbit the atoms;
 # close the window to start the calculation)
-muon_position, nnindices = AO.get_muon_pos_nn_visually(CaF2_atoms)
+# muon_position, nnindices = AO.get_muon_pos_nn_visually(CaF2_atoms)
+
+muon_position = [2.72, 1.36, 4.08]
+nnindices = [4,9]
+
 
 def main():
     # set up the parameters
     params = Parameters()
-    params.add('A', value=26)
-    params.add('r_nn', value=1.241, min=1, max=2)
+    params.add('A', value=10)
+    params.add('r_nn', value=1.18, min=1, max=2)
     params.add('lambda_squish', value=0.9, min=0.5, max=1)
-    params.add('A0', value=-1, min=-5, max=5)
+    params.add('A0', value=0, min=-5, max=5)
 
     # try to do a fit
-    fit(data_file_location='CaF2_data.dat', end_time=15, fit_function=fit_function, params=params, plot=True)
+    fit(data_file_location='./CaF2_data.dat', end_time=15, fit_function=fit_function, params=params, plot=True)
+
 
 # fit function
 def fit_function(params, x):
@@ -48,13 +53,13 @@ def fit_function(params, x):
     lambda_squish = params['lambda_squish']
     A0 = params['A0']
 
-    squish_radii = [r_nn, None]
+    squish_radii = [r_nn]
 
     muon, All_spins = AO.get_linear_fmuf_atoms(ase_atoms=CaF2_atoms, muon_position=muon_position,
-                                               nnnness=4, squish_radii=squish_radii, lambda_squish=lambda_squish)
+                                               nnnness=10, squish_radii=squish_radii, lambda_squish=lambda_squish)
 
     deco = DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=None, times=x,
-                                                         plot=False, shutup=True)
+                                                         plot=False, shutup=True, gpu=True)
 
     return A*deco + A0*np.ones(len(x))
 

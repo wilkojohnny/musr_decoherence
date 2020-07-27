@@ -14,6 +14,7 @@ import time as human_time
 import TCoord3D as coord  # coordinate utilities
 import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
+import math
 no_plot = False
 try:
     import matplotlib.pyplot as pyplot  # plotting
@@ -109,17 +110,9 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         for atom in all_spins:
             print(atom)
 
-    old_gpu = True
-
     if gpu:
         try:
             import cupy as cp
-            if int(cp.cuda.device.Device(0).compute_capability) >= 30:
-                print('💰 Rich user detected. Will use the GPU to its full potential.')
-                old_gpu = False
-            else:
-                print('👴🏻 Grandpa-GPU mode activated. Will only utilise basic GPU optimisation.')
-                old_gpu = True
         except ImportError:
             print('Can\'t find CuPy module. Have you set up CUDA?')
             gpu = False
@@ -158,10 +151,11 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         for spin in Spins:
             hilbert_dim *= spin.II + 1
 
-        # create measurement operators for the muon's spin
-        muon_spin_x = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
-        muon_spin_y = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
-        muon_spin_z = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
+        if not gpu:
+            # create measurement operators for the muon's spin
+            muon_spin_x = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
+            muon_spin_y = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
+            muon_spin_z = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
 
         start_time = human_time.time()
 
@@ -180,23 +174,14 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         if gpu:
             dense_hamiltonian = cp.array(dense_hamiltonian, dtype='csingle')
             this_E, R = cp.linalg.eigh(dense_hamiltonian)
-            Rinv = cp.conj(R).transpose()
+            del dense_hamiltonian
+            Rinv = R.transpose().conj()
         else:
             this_E, R = linalg.eigh(dense_hamiltonian)
             Rinv = R.H
         if not shutup:
             print("Found eigenvalues:")
             print(this_E)
-
-        # now upload the muon spin matrices to the GPU (making them sparse if possible)
-        if gpu and not old_gpu:
-            muon_spin_x = cp.sparse.csr_matrix(muon_spin_x, dtype='csingle')
-            muon_spin_y = cp.sparse.csr_matrix(muon_spin_y, dtype='csingle')
-            muon_spin_z = cp.sparse.csr_matrix(muon_spin_z, dtype='csingle')
-        elif gpu and old_gpu:
-            muon_spin_x = cp.array(muon_spin_x.todense(), dtype='csingle')
-            muon_spin_y = cp.array(muon_spin_y.todense(), dtype='csingle')
-            muon_spin_z = cp.array(muon_spin_z.todense(), dtype='csingle')
 
         # weights -- if single crystal, use that; otherwise use 1/sqrt(3) for each
         wx, wy, wz = (1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3))
@@ -205,58 +190,45 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         # Calculate constant (lab book 1 page 105)
         thisconst = 0
-        for i in range(0, len(R)):
-            if gpu:
-                sx = cp.matmul(Rinv[i], muon_spin_x.dot(R[:, i]))
-                sy = cp.matmul(Rinv[i], muon_spin_y.dot(R[:, i]))
-                sz = cp.matmul(Rinv[i], muon_spin_z.dot(R[:, i]))
-            else:
-                sx = Rinv[i] * muon_spin_x * R[:, i]
-                sy = Rinv[i] * muon_spin_y * R[:, i]
-                sz = Rinv[i] * muon_spin_z * R[:, i]
-            # angular average mode
-            thisconst = thisconst + pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)
-        const = const + probability * thisconst / (2 * (hilbert_dim / 2))
-
-        # now calculate oscillating term
         this_amplitude = np.zeros((len(R), len(R)))
-        for i in range(0, len(R)):
-            if gpu:
-                Rx = muon_spin_x.dot(R[:, i])
-                Ry = muon_spin_y.dot(R[:, i])
-                Rz = muon_spin_z.dot(R[:, i])
-                # Rx = cp.matmul(Rinv[i], muon_spin_x)
-                # Ry = cp.matmul(Rinv[i], muon_spin_y)
-                # Rz = cp.matmul(Rinv[i], muon_spin_z)
-            else:
+
+        if not gpu:
+            for i in range(0, len(R)):
                 Rx = Rinv[i] * muon_spin_x
                 Ry = Rinv[i] * muon_spin_y
                 Rz = Rinv[i] * muon_spin_z
+                sx = Rx * R[:, i]
+                sy = Ry * R[:, i]
+                sz = Rz * R[:, i]
+                # angular average mode
+                thisconst = thisconst + pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)
 
-            if not shutup:
-                print(str(100 * i / len(R)) + '% complete...')
-            if fourier_2d:
-                jmin = 0
-            else:
-                jmin = i + 1
-            for j in range(jmin, len(R)):
-                if gpu:
-                    sx = cp.matmul(Rinv[j], Rx)
-                    sy = cp.matmul(Rinv[j], Ry)
-                    sz = cp.matmul(Rinv[j], Rz)
-                    # sx = cp.matmul(Rx, R[:, j])
-                    # sy = cp.matmul(Ry, R[:, j])
-                    # sz = cp.matmul(Rz, R[:, j])
+                if not shutup:
+                    print(str(100 * i / len(R)) + '% complete...')
+                if fourier_2d:
+                    jmin = 0
                 else:
+                    jmin = i + 1
+                for j in range(jmin, len(R)):
                     sx = Rx * R[:, j]
                     sy = Ry * R[:, j]
                     sz = Rz * R[:, j]
-                # do angular averaging
-                this_amplitude[i][j] = (pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)) \
-                                       * probability / (hilbert_dim / 2)
+                    # do angular averaging
+                    this_amplitude[i][j] = (pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)) \
+                                            * probability / (hilbert_dim / 2)
 
-        amplitude.append(this_amplitude.tolist())
-        E.append(this_E.tolist())
+            const = const + probability * thisconst / (2 * (hilbert_dim / 2))
+            amplitude.append(this_amplitude.tolist())
+            E.append(this_E.tolist())
+        else:
+            R_roll = cp.roll(R, int(hilbert_dim / 2), 0)
+
+            this_amplitude = calc_amplitudes_gpu(R, Rinv, R_roll, (wx, wy, wz), hilbert_dim)
+
+            del R, Rinv, R_roll
+
+            amplitude.append(this_amplitude)
+            E.append(this_E)
 
         # increment the isotope ids
         current_isotope_ids = inc_isotope_id(basis=number_isotopes, oldids=current_isotope_ids)
@@ -375,7 +347,11 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 P_average.append(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
                                                                           amplitude_device,
                                                                           len(E[0]),
-                                                                          time) + const)
+                                                                          time))
+            del E_diff_device
+            del amplitude_device
+            del amplitude
+            del E
 
         if not shutup:
             print("elapsed time: " + str(human_time.time() - start_time))
@@ -399,4 +375,74 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             pyplot.ylabel('Muon Polarisation')
             pyplot.show()
 
+        if gpu:
+            mempool = cp.get_default_memory_pool()
+            pinned_mempool = cp.get_default_pinned_memory_pool()
+            mempool.free_all_blocks()
+            pinned_mempool.free_all_blocks()
+
         return np.array(P_average)
+
+
+def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
+    """
+    calculate the amplitudes of the interactions between eigenstates
+    :param R: eigenvectors of the Hamiltonian
+    :param Rinv: conj eigenvectors of the Hamiltonian
+    :param weights: weights wx, wy, wz corresponding to whether a polycrystaline average or not
+    :param size: size of the Hilbert space
+    :return 2D list where a[i][j] is the amplitude of state E[i]-E[j]
+    """
+
+    import cupy as cp
+
+    # calculate the number of blocks etc
+    if size < 16:
+        threads_per_block = 4
+    else:
+        threads_per_block = 16
+    blocks = math.ceil(size / threads_per_block)
+
+    R_z = cp.zeros((size, size), dtype='complex64', order='F')
+    R_y = cp.zeros((size, size), dtype='complex64', order='F')
+
+    minus_kernel = cp.RawKernel(r'''
+                #include <cupy/complex.cuh>
+                extern "C"__global__
+                void minus_kernel(const complex<float> *R, complex<float> *Res,
+                                int N) {
+
+                   int i, j;
+
+                   // Determine thread position i j within thread block.
+                   i = blockIdx.x*blockDim.x + threadIdx.x;
+                   j = blockIdx.y*blockDim.y + threadIdx.y;
+
+                   if (i<N && j<N) {
+                    if (i<N/2) {
+                        Res[i + N*j] = -R[i+ N*j];
+                    } else {
+                        Res[i + N*j] = R[i+ N*j];
+                    }
+                   }
+                }
+                ''', 'minus_kernel')
+
+    minus_kernel((blocks, blocks), (threads_per_block, threads_per_block), (R, R_z, size))
+    minus_kernel((blocks, blocks), (threads_per_block, threads_per_block), (R_roll, R_y, size))
+    R_x = R_roll
+
+    mod_squared = cp.ElementwiseKernel(
+        'complex64 x', 'complex64 z',
+        'z = abs(x); z = z * z',
+        'mod_squared')
+
+    a = 1 / (size/2) * (mod_squared(cp.matmul(Rinv, R_x))*weights[0]**2 +
+                        mod_squared(cp.matmul(Rinv, R_y))*weights[1]**2 +
+                        mod_squared(cp.matmul(Rinv, R_z))*weights[2]**2)
+
+    del R, Rinv, R_x, R_y, R_z, R_roll
+
+    return a
+
+

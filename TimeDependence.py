@@ -106,8 +106,6 @@ def calc_oscillating_term_gpu(E_diff_gpu, A_gpu, size, t):
     osc_kernel = cp.RawKernel(r'''
     extern "C"__global__
     void osc_kernel(float *Amp, float *EDiff, int N, double t, float *p) {
-       __shared__ float shrA [''' + str(threads_per_block) + '''];
-       __shared__ float shrB [''' + str(threads_per_block) + '''];
 
        int y, x, i, j;
 
@@ -120,10 +118,13 @@ def calc_oscillating_term_gpu(E_diff_gpu, A_gpu, size, t):
        
        if (i<j) {
             p[i*N + j] = Amp[i*N+j]*cosf(EDiff[i*N+j]*t);
+       } else if (i=j) {
+            p[i*N + j] = 0.5*Amp[i*N+j];
        }
+        
     }
     ''', 'osc_kernel')
 
     osc_kernel((blocks, blocks), (threads_per_block, threads_per_block), (A_gpu, E_diff_gpu, size, t, p))
 
-    return cp.sum(cp.sum(p))
+    return cp.asnumpy(cp.sum(cp.sum(p))).max()
