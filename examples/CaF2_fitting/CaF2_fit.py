@@ -36,13 +36,14 @@ nnindices = [4,9]
 def main():
     # set up the parameters
     params = Parameters()
-    params.add('A', value=26)
-    params.add('r_nn', value=1.241, min=1, max=2)
+    params.add('A', value=10)
+    params.add('r_nn', value=1.18, min=1, max=2)
     params.add('lambda_squish', value=0.9, min=0.5, max=1)
-    params.add('A0', value=-1, min=-5, max=5)
+    params.add('A0', value=0, min=-5, max=5)
 
     # try to do a fit
-    fit(data_file_location='./CaF2_data.dat', end_time=15, fit_function=fit_function, params=params, plot=False)
+    fit(data_file_location='./CaF2_data.dat', end_time=15, fit_function=fit_function, params=params, plot=True)
+
 
 # fit function
 def fit_function(params, x):
@@ -55,7 +56,7 @@ def fit_function(params, x):
     squish_radii = [r_nn]
 
     muon, All_spins = AO.get_linear_fmuf_atoms(ase_atoms=CaF2_atoms, muon_position=muon_position,
-                                               nnnness=7, squish_radii=squish_radii, lambda_squish=lambda_squish)
+                                               nnnness=10, squish_radii=squish_radii, lambda_squish=lambda_squish)
 
     deco = DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=None, times=x,
                                                          plot=False, shutup=True, gpu=True)
