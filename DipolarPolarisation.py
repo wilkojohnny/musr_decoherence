@@ -88,6 +88,7 @@ def inc_isotope_id(basis, oldids=None):
 
 def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
                               times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
+                              mag_field: coord = None,
                               # other arguments
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
                               plot: bool = False, shutup: bool = False, gpu: bool = False):
@@ -164,6 +165,9 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         if do_quadrupoles:
             hamiltonian += Hamiltonians.calc_quadrupolar_hamiltonian(Spins)
+
+        if mag_field is not None:
+            hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, mag_field)
 
         del Spins
 

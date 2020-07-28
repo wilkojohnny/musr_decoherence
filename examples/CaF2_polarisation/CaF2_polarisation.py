@@ -44,15 +44,15 @@ def main():
 
     # get the muon, All_spins objects to feed the polarisation function
     muon, All_spins = AO.get_linear_fmuf_atoms(ase_atoms=CaF2_atoms, muon_position=muon_position,
-                                               nnnness=6, squish_radii=squish_radii, lambda_squish=lambda_squish)
+                                               nnnness=3, squish_radii=squish_radii, lambda_squish=lambda_squish)
 
-    output_file_name = 'CaF2_longt_polarisation.dat'
+    output_file_name = 'CaF2_polarisation.dat'
 
     # define muon polarisation relative to the sample -- None for polycrystalline
     muon_sample_polarisation = None
 
     DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=muon_sample_polarisation,
-                                                  plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=True, shutup=False,
+                                                  plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=False, shutup=False,
                                                   times=np.arange(0, 20, 0.1), outfile_location=output_file_name)
     return 0
 

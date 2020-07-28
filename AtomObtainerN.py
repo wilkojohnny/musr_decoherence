@@ -108,7 +108,7 @@ def ase_nnnfinder(nnnness: int, pwo_file: str = None, atoms_mu: Atoms = None, sq
     # check only one of pwo_file or atoms_mu are set
     assert (pwo_file is None) ^ (atoms_mu is None)
 
-    if lambda_start_nnnness is None:
+    if lambda_start_nnnness is None and lambda_squish != 1:
         lambda_start_nnnness = len(squish_radii) + 2
 
     if not (0 <= dft_correction <= 1):
