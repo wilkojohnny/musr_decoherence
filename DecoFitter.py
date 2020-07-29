@@ -4,19 +4,22 @@
 
 # flush printing cache (useful for ARC)
 import functools
+
 print = functools.partial(print, flush=True)
 
 import numpy as np  # for numpy arrays
+
 try:
-	import matplotlib.pyplot as pyplot  # for plotting
-	import matplotlib.colors as color  # for colourful plots
+    import matplotlib.pyplot as pyplot  # for plotting
+    import matplotlib.colors as color  # for colourful plots
 except ModuleNotFoundError:
-	no_plot = True
+    no_plot = True
 
 from lmfit import *  # for nls curve fitting
 
 
-def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, start_time=None, end_time=None, just_plot=False):
+def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, start_time=None, end_time=None,
+        just_plot=False, outfile_location=None):
     """
     :param data_file_location: location of the muon data file
     :param fit_function: function to be fitted
@@ -46,6 +49,10 @@ def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, s
     # calculate the fit function one last time
     fit_func = fit_function(fitted_params, x)
 
+    # save the fit function to file
+    if outfile_location is not None:
+        save_fit(x, fit_func, filename=outfile_location, params=fitted_params)
+
     # plot the data
     if plot:
         pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
@@ -54,6 +61,17 @@ def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, s
         pyplot.show()
 
     return fitted_params
+
+
+def save_fit(x, fit_function, filename, params):
+    with open(filename, 'w') as file:
+        file.write('! Fitting output for MuSR data \n')
+        file.write('!\n! Fitting parameters: \n')
+        for name, parameter in params.items():
+            file.write('!' + name + ': ' + str(parameter.value) + ' +/- ' + str(parameter.stderr) + '\n')
+        file.write('! t\tfitting function output\n')
+        for i_x in range(0, len(x)):
+            file.write(str(x[i_x]) + '\t' + str(fit_function[i_x]))
 
 
 def gle_friendly_out(fit_parameters):
