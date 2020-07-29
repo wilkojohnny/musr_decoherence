@@ -68,10 +68,10 @@ def save_fit(x, fit_function, filename, params):
         file.write('! Fitting output for MuSR data \n')
         file.write('!\n! Fitting parameters: \n')
         for name, parameter in params.items():
-            file.write('!' + name + ': ' + str(parameter.value) + ' +/- ' + str(parameter.stderr) + '\n')
+            file.write('! ' + name + ': ' + str(parameter.value) + ' +/- ' + str(parameter.stderr) + '\n')
         file.write('! t\tfitting function output\n')
         for i_x in range(0, len(x)):
-            file.write(str(x[i_x]) + '\t' + str(fit_function[i_x]))
+            file.write(str(x[i_x]) + '\t' + str(fit_function[i_x]) + '\n')
 
 
 def gle_friendly_out(fit_parameters):
