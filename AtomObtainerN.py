@@ -230,12 +230,13 @@ def ase_nnnfinder(nnnness: int, pwo_file: str = None, atoms_mu: Atoms = None, sq
             this_squish = None
             if len(squish_radii) > current_nnnness - 2:
                 this_squish = squish_radii[current_nnnness - 2]
-            elif current_nnnness >= lambda_start_nnnness:
-                this_squish = mu_distances[i_nearest_neighbour][1] * lambda_squish
-                # if this wants to squish loads, put out a warning
-                if this_squish < squish_radii[-1]:
-                    print('The lambda_squish brings in the atoms closer than the most distant squish value. Be careful '
-                          'with the results.')
+            elif lambda_start_nnnness is not None:
+                if current_nnnness >= lambda_start_nnnness:
+                    this_squish = mu_distances[i_nearest_neighbour][1] * lambda_squish
+                    # if this wants to squish loads, put out a warning
+                    if this_squish < squish_radii[-1]:
+                        print('The lambda_squish brings in the atoms closer than the most distant squish value. Be careful '
+                              'with the results.')
             if this_squish is not None:
                 nearest_neighbour_atoms.set_distance(0, i_nearest_neighbour, this_squish, 0)
 
