@@ -169,8 +169,6 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         if mag_field is not None:
             hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, mag_field)
 
-        del Spins
-
         # find eigenvalues and eigenvectors of hamiltonian
         if not shutup:
             print("Finding eigenvalues...")
