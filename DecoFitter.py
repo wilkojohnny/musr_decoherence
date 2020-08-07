@@ -19,7 +19,7 @@ from lmfit import *  # for nls curve fitting
 
 
 def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, start_time=None, end_time=None,
-        just_plot=False, outfile_location=None):
+        just_plot=False, outfile_location=None, algorithm='leastsq'):
     """
     :param data_file_location: location of the muon data file
     :param fit_function: function to be fitted
@@ -39,7 +39,8 @@ def fit(data_file_location: str, fit_function, params: Parameters, plot: bool, s
     fitted_params = params
 
     if not just_plot:
-        fit_result = minimize(residual, params, args=(fit_function, x, y, y_error), iter_cb=print_iteration)
+        fit_result = minimize(residual, params, args=(fit_function, x, y, y_error), iter_cb=print_iteration,
+                              method=algorithm)
 
         print(fit_result.message)
         print(fit_report(fit_result))
