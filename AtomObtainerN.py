@@ -7,6 +7,8 @@ Created 23/3/2020 by John Wilkinson (during COVID isolation!)
 
 import math
 
+import copy
+
 import numpy as np
 from ase import Atoms, atom, io
 from ase import build
@@ -291,6 +293,9 @@ def add_muon_to_aseatoms(atoms: Atoms, muon_position: np.ndarray, nn_indices: li
     :return: ASE atoms with the muon
     """
 
+    # make a copy of atoms
+    atoms = copy.deepcopy(atoms)
+
     muon_atom_obj = atom.Atom('mu', muon_position)
     atoms.append(muon_atom_obj)
 
@@ -327,7 +332,7 @@ def add_muon_to_aseatoms_bent(ase_atoms: Atoms, fluorines: list, plane_atom, fmu
         f0 = coord(fluorines[0][0], fluorines[0][1], fluorines[0][2])
         f1 = coord(fluorines[1][0], fluorines[1][1], fluorines[1][2])
 
-    if isinstance(plane_atom, int):
+    if isinstance(plane_atom, int) or isinstance(plane_atom, np.int64):
         plane_atom_position_array = ase_atoms[plane_atom].position
         plane_atom_position = coord(plane_atom_position_array[0], plane_atom_position_array[1],
                                     plane_atom_position_array[2])
