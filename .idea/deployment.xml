@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" stopOnFirstError="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="goopy" stopOnFirstError="true">
+    <serverData>
+      <paths name="goopy">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/johnny/musr-decoherence " local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
     <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

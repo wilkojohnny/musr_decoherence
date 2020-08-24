@@ -13,11 +13,9 @@ import math
 def calc_p_average_t(t, const, amplitude, E):
     # calculate the oscillating term
     osc_term = 0
-    for isotope_combination in range(0, len(amplitude)):
-        for i in range(0, len(E[isotope_combination])):
-            for j in range(i + 1, len(E[isotope_combination])):
-                osc_term = osc_term + amplitude[isotope_combination][i][j] * np.cos((E[isotope_combination][i]
-                                                                                     - E[isotope_combination][j]) * t)
+    for i in range(0, len(E)):
+        for j in range(i + 1, len(E)):
+            osc_term = osc_term + amplitude[i][j] * np.cos((E[i] - E[j]) * t)
 
     # add on the constant, and return, and divide by the size of the space
     return const + osc_term

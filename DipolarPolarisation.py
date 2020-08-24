@@ -26,11 +26,11 @@ from enum import Enum
 
 class musr_type(Enum):
     ZF = 0
-    LF = 1
-    TF = 2
     zero_field = 0
-    longitudinal = 1
-    transverse = 2
+    LF = 1
+    longitudinal_field = 1
+    TF = 2
+    transverse_field = 2
 
 
 # do decoherence file preamble
@@ -97,7 +97,8 @@ def inc_isotope_id(basis, oldids=None):
 
 
 def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
-                              times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
+                              times: np.ndarray = np.arange(0, 10, 0.1), musr_type : musr_type = musr_type.zero_field,
+                              field=0, do_quadrupoles=False, just_muon_interactions=False,
                               # other arguments
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
                               plot: bool = False, shutup: bool = False, gpu: bool = False):
@@ -106,6 +107,10 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     :param muon:
     :param muon_sample_polarisation:
     :param times:
+    :param musr_type:
+    :param do_quadrupoles:
+    :param just_muon_interactions:
+    :param field:
     :param fourier:
     :param fourier_2d:
     :param outfile_location:
@@ -235,6 +240,35 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
             del R, Rinv, R_roll
 
+        # now calculate the polarisation if not fourier
+        if not fourier:
+            P_average = np.zeros(shape=times.shape)
+
+            # calculate each time separately
+            if not gpu:
+                for i_time, time in np.ndenumerate(times):
+                    if not shutup:
+                        print("t=" + str(time))
+                    P_average[i_time] += TimeDependence.calc_p_average_t(time, const, this_amplitude, this_E).max()\
+                                         * probability
+            else:
+                # calculate the differences E[i]-E[j] and put into matrix on the GPU
+                E_diff_device = TimeDependence.calc_outer_differences_gpu(this_E)
+
+                # now upload the amplitudes onto the device
+                amplitude_device = cp.asarray(this_amplitude, dtype='float32')
+
+                for i_time, time in np.ndenumerate(times):
+                    if not shutup:
+                        print("t=" + str(time))
+                    P_average[i_time] += TimeDependence.calc_oscillating_term_gpu(E_diff_device, amplitude_device,
+                                                                                  len(this_E), time) * probability
+
+                del E_diff_device
+                del amplitude_device
+
+        else:
+            # only save if fourier mode (otherwise absolutely no point...)
             amplitude.append(this_amplitude)
             E.append(this_E)
 
@@ -333,33 +367,6 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         return np.array(fourier_result)
     else:
-
-        P_average = []
-
-        # calculate each time separately
-        if not gpu:
-            for time in np.nditer(times):
-                if not shutup:
-                    print("t=" + str(time))
-                P_average.append(TimeDependence.calc_p_average_t(time, const, amplitude, E).max())
-        else:
-            # calculate the differences E[i]-E[j] and put into matrix on the GPU
-            E_diff_device = TimeDependence.calc_outer_differences_gpu(E[0])
-
-            # now upload the amplitudes onto the device
-            amplitude_device = cp.asarray(amplitude[0], dtype='float32')
-
-            for time in times:
-                if not shutup:
-                    print("t=" + str(time))
-                P_average.append(TimeDependence.calc_oscillating_term_gpu(E_diff_device,
-                                                                          amplitude_device,
-                                                                          len(E[0]),
-                                                                          time))
-            del E_diff_device
-            del amplitude_device
-            del amplitude
-            del E
 
         if not shutup:
             print("elapsed time: " + str(human_time.time() - start_time))
