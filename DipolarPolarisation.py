@@ -20,7 +20,17 @@ try:
     import matplotlib.pyplot as pyplot  # plotting
 except ModuleNotFoundError:
     no_plot = True
-import os  #
+import os
+from enum import Enum
+
+
+class musr_type(Enum):
+    ZF = 0
+    LF = 1
+    TF = 2
+    zero_field = 0
+    longitudinal = 1
+    transverse = 2
 
 
 # do decoherence file preamble
@@ -88,7 +98,6 @@ def inc_isotope_id(basis, oldids=None):
 
 def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
                               times: np.ndarray = np.arange(0, 10, 0.1), do_quadrupoles=False, just_muon_interactions=False,
-                              mag_field: coord = None,
                               # other arguments
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
                               plot: bool = False, shutup: bool = False, gpu: bool = False):
@@ -165,9 +174,6 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         if do_quadrupoles:
             hamiltonian += Hamiltonians.calc_quadrupolar_hamiltonian(Spins)
-
-        if mag_field is not None:
-            hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, mag_field)
 
         # find eigenvalues and eigenvectors of hamiltonian
         if not shutup:
@@ -384,6 +390,31 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             pinned_mempool.free_all_blocks()
 
         return np.array(P_average)
+
+
+def calc_TF_polarisation(all_spins: list, muon:atom, field=0, times: np.ndarray = np.arange(0, 10, 0.1),
+                         do_quadrupoles=False, just_muon_interactions=False,
+                         # other arguments
+                         fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None,
+                         tol: float = 1e-10, plot: bool = False, shutup: bool = False, gpu: bool = False):
+    """
+    Calculates the TF-muSR polarisation with the dipolar interaction. Does not treat anything as a perturbation
+    :param all_spins: list of all spins to be included in the calculation
+    :param muon: TDecoherenceAtom object of the muon
+    :param field: Magnetic field applied in Gauss
+    :param times: numpy array of times to do the calculation at
+    :param do_quadrupoles: also calculate the quadrupole Hamiltonian
+    :param just_muon_interactions: just do intereactions between the muon and each nuclei
+    :param fourier: calculate fourier spectrum
+    :param fourier_2d: calculate 2D fourier spectrum
+    :param outfile_location: location of file to save to
+    :param tol: maximum difference between two fourier frequencies to be considered the same
+    :param plot: if True, produces plot
+    :param shutup: if True, does not print out anything
+    :param gpu: if True, uses GPU to speed up calculations (makes a HUGE difference!)
+    """
+    pass
+
 
 
 def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
