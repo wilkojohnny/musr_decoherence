@@ -237,6 +237,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                        math.sin((N_theta-1)*d_theta/2) / math.sin(d_theta/2)
                 for theta in np.arange(d_theta, math.pi, d_theta):
                     for phi in np.arange(0, 2*math.pi, d_phi):
+                        if not shutup:
+                            print('theta: ' + '{:4f}'.format(theta) + '\t phi: ' + '{:4f}'.format(phi))
                         wx, wy, wz = math.sin(theta)*math.cos(phi), math.sin(theta)*math.sin(phi), math.cos(theta)
                         if musr_type == musr_type.LF:
                             field_direction = coord(wx, wy, wz)
@@ -257,9 +259,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                              const=const,
                                                                                              probability=probability,
                                                                                              hilbert_dim=hilbert_dim,
-                                                                                             gpu=gpu, shutup=shutup)
-
-                        print(str(this_pol.min()) + ' ' + str(theta) + ' ' + str(phi))
+                                                                                             gpu=gpu, shutup=True)
 
                         if fourier:
                             this_amplitude += this_amplitude_ang * math.sin(theta) / normalisation_factor
@@ -468,12 +468,11 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
                 sz = Rz * R[:, j]
                 # do angular averaging if wx, wy, wz == None
                 if wx is None or wy is None or wz is None:
-                    this_amplitude[i][j] = (pow(abs(sx), 2) + pow(abs(sy), 2) + pow(abs(sz), 2)) \
-                                           * probability / (3 * hilbert_dim / 2)
+                    this_amplitude[i][j] = (pow(abs(sx), 2) + pow(abs(sy), 2) + pow(abs(sz), 2)) / (3 * hilbert_dim / 2)
                 else:
                     # not doing angular averaging -- so need to also include the sigma_i*sigma_j terms
                     this_amplitude[i][j] = (pow(abs(sx) * wx, 2) + pow(abs(sy) * wy, 2) + pow(abs(sz) * wz, 2)) \
-                                           * probability / (hilbert_dim / 2)
+                                           / (hilbert_dim / 2)
 
                     # xy
                     this_amplitude[i][j] = this_amplitude[i][j] + wx*wy*(pow(abs(sx + sy), 2) - pow(abs(sx), 2)
@@ -580,12 +579,25 @@ def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
 
     if weights[0] is None or weights[1] is None or weights[2] is None:
         # angular average
-        a = 1 / (3*size/2) * (mod_squared(cp.matmul(Rinv, R_x))**2 +
-                              mod_squared(cp.matmul(Rinv, R_y))**2 +
-                              mod_squared(cp.matmul(Rinv, R_z))**2)
+        a = 1 / (3*size/2) * (mod_squared(cp.matmul(Rinv, R_x)) +
+                              mod_squared(cp.matmul(Rinv, R_y)) +
+                              mod_squared(cp.matmul(Rinv, R_z)))
     else:
         # not an angular average
-        assert False
+        wx, wy, wz = weights
+        a = 1 / (size/2) * (mod_squared(cp.matmul(Rinv, R_x)*wx) +
+                            mod_squared(cp.matmul(Rinv, R_y)*wy) +
+                            mod_squared(cp.matmul(Rinv, R_z)*wz) +
+                            # xy
+                            wx * wy * (mod_squared(cp.matmul(Rinv, R_x) + 1j*cp.matmul(Rinv, R_y))
+                                       - mod_squared(cp.matmul(Rinv, R_x)) - mod_squared(cp.matmul(Rinv, R_y))) +
+                            # yz
+                            wy * wz * (mod_squared(1j*cp.matmul(Rinv, R_y) + cp.matmul(Rinv, R_z))
+                                       - mod_squared(cp.matmul(Rinv, R_y)) - mod_squared(cp.matmul(Rinv, R_z))) +
+                            # xz
+                            wx * wz * (mod_squared(cp.matmul(Rinv, R_x) + cp.matmul(Rinv, R_z))
+                                       - mod_squared(cp.matmul(Rinv, R_x)) - mod_squared(cp.matmul(Rinv, R_z)))
+                            )
 
     del R, Rinv, R_x, R_y, R_z, R_roll
 
