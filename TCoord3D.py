@@ -75,6 +75,17 @@ class TCoord3D:
         else:
             return 0
 
+    def get_perpendicular_vector(self, normalise=True):
+        while True:
+            cross_vector = np.random.rand(3)
+            perp_vector = np.cross(self.tonumpyarray(), cross_vector)
+            if not np.all((perp_vector == 0)):
+                perp_vector = TCoord3D(perp_vector[0], perp_vector[1], perp_vector[2])
+                if normalise:
+                    return perp_vector.rhat()
+                else:
+                    return perp_vector
+
     def totuple(self):
         return self.ortho_x, self.ortho_y, self.ortho_z,
 
