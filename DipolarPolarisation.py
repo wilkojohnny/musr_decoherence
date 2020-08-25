@@ -34,8 +34,8 @@ class musr_type(Enum):
 
 
 # do decoherence file preamble
-def decoherence_file_preamble(file, nn_atoms, muon, fourier, starttime=None, endtime=None, timestep=None,
-                              fourier_2d=None, tol=None):
+def decoherence_file_preamble(file, nn_atoms, muon, fourier, musr_type, field = 0, starttime=None, endtime=None,
+                              timestep=None, fourier_2d=None, tol=None):
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
 
@@ -47,6 +47,8 @@ def decoherence_file_preamble(file, nn_atoms, muon, fourier, starttime=None, end
         version_label = '(version not available)'
 
     file.writelines('! Using version ' + str(version_label) + '\n!\n')
+
+    file.writelines('! Calculated for ' + str(musr_type) + '-MUSR, with a field of ' + str(field) + 'Gauss\n!\n')
 
     # type of calculation
     if not fourier:
@@ -138,7 +140,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     fourier_2d = fourier_2d and fourier
 
     # covert the field from Gauss to Tesla
-    field *= 1e-4
+    field_tesla = field * 1e-4
 
     # count number of spins
     N_spins = len(all_spins) - 1
@@ -198,10 +200,10 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             # single crystal sample
             wx, wy, wz = muon_sample_polarisation.totuple()
             if musr_type == musr_type.LF:
-                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, coord(wx, wy, wz) * field)
+                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, coord(wx, wy, wz) * field_tesla)
             elif musr_type == musr_type.TF:
                 field_direction = coord(wx, wy, wz).get_perpendicular_vector(normalise=True)
-                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, field_direction*field)
+                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, field_direction*field_tesla)
 
             # now calculate the polarisation or fourier components
             P_average, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times, weights=(wx, wy, wz),
@@ -247,7 +249,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                     -math.sin(theta))
                         current_hamiltonian = hamiltonian + Hamiltonians.calc_zeeman_hamiltonian(Spins,
                                                                                                  field_direction
-                                                                                                 * field)
+                                                                                                 * field_tesla)
                         # calculate the polarisation or fourier components
                         this_pol, this_E, this_amplitude_ang = calc_hamiltonian_polarisation(current_hamiltonian, times,
                                                                                              weights=(wx, wy, wz),
@@ -375,7 +377,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             # do preamble
             decoherence_file_preamble(file=outfile, nn_atoms=all_spins, muon=muon, fourier=fourier,
                                       fourier_2d=fourier_2d, tol=tol, starttime=times[0], endtime=times[-1],
-                                      timestep=times[1] - times[0])
+                                      timestep=times[1] - times[0], musr_type=musr_type, field=field)
             outfile.writelines('! t P_average \n')
             write_to_file(outfile, times, P_average)
             outfile.close()
