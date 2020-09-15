@@ -38,16 +38,16 @@ def main():
 
     # squish_radii -- this is how much the [nn, nnn, nnnn...] atoms should be
     # drawn in/out by (i.e the new bond lengths, in Angstroms)
-    squish_radii = [1.26]
+    squish_radii = [1.172, 1.172]
     # lambda_squish -- the factor by all the nearest-neighbours above what is
     # defined in squish_radii are perturbed by (in most cases <1)
-    lambda_squish = 0.937
+    lambda_squish = 0.920
 
     # get the muon, All_spins objects to feed the polarisation function
     muon, All_spins = AO.get_linear_fmuf_atoms(ase_atoms=CaF2_atoms, muon_position=muon_position,
                                                nnnness=6, squish_radii=squish_radii, lambda_squish=lambda_squish)
 
-    output_file_name = 'CaF2_polarisation.dat'
+    output_file_name = '../../../CaF2_polarisation_T20.dat'
 
     # define muon polarisation relative to the sample -- None for polycrystalline
     muon_sample_polarisation = None

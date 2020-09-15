@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="f0dae697-f22e-4efd-886f-b27659d56e98" name="goopy" url="http://localhost">
+        <fileTransfer accessType="SFTP" host="192.168.1.2" port="22" sshConfigId="3823b854-7796-4181-aa76-50009b630fa2" sshConfig="johnny@192.168.1.2:22 password" />
+      </webServer>
+    </option>
+  </component>
+</project>

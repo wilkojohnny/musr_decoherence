@@ -23,9 +23,18 @@ class TDecoherenceAtom:
                 II = nucleon_properties[name]['II']
                 abundance = nucleon_properties[name]['abundance']
                 charge = nucleon_properties[name]['charge']
-                if II > 1:
+
+                do_quadrupoles = False
+                try:
+                    if any(this_II > 1 for this_II in II):
+                        do_quadrupoles = True
+                except TypeError:
+                    if II > 1:
+                        do_quadrupoles = True
+                if do_quadrupoles:
                     Q = nucleon_properties[name]['Q']
                     anti_shielding = nucleon_properties[name]['anti_shielding']
+
             except KeyError:
                 print('WARNING -- Atom ' + name + ' is not in the database. The magnetic properties will be ignored.')
                 II = 0
@@ -45,14 +54,13 @@ class TDecoherenceAtom:
         self.anti_shielding = anti_shielding
         self.efg = efg  # EFG is [V_xx, V_yy, V_zz] in Å^-3
 
-        # check values make sense for quadrupoles
-        if Q is not None:
-            assert II > 1
-
-        if type(abundance) is np.ndarray:
+        if hasattr(abundance, '__iter__'):
             # if there's more than one isotope, register them as a list
             for i in range(0, len(abundance)):
-                self.isotopes.append(TDecoherenceAtom(self.position, self.gyromag_ratio[i], self.II[i], self.name, self.abundance[i]))
+                self.isotopes.append(TDecoherenceAtom(position=self.position, gyromag_ratio=self.gyromag_ratio[i],
+                                                      II=self.II[i], name=self.name, abundance=self.abundance[i],
+                                                      anti_shielding=self.anti_shielding, efg=self.efg,
+                                                      Q=self.Q[i]))
             # don't define any of the pauli matrices
             self.pauli_x = None
             self.pauli_y = None
@@ -176,7 +184,10 @@ nucleon_properties = {
           "charge": +1},
     "Li": {"II": np.array([2, 3]),
            "gyromag_ratio": np.array([6.2655, 16.5465])*2*3.14145926,
-           "abundance": np.array([0.0742, 0.9258])
+           "abundance": np.array([0.0742, 0.9258]),
+           "charge": +1,
+           "Q": np.array([-0.0008, -0.045]),
+           "anti_shielding": -0.2570
            },
     "F": {"II": 1,
           "gyromag_ratio": 251.713,

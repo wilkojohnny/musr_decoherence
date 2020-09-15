@@ -161,13 +161,13 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     E = list()
     amplitude = list()
     const = 0
+    P_average = np.zeros(shape=times.shape)
     while current_isotope_ids[0] != -1:  # the end signal is emitted by making the id of 0 = -1
         # put this combination of isotopes into an array (Spins), and calculate probability of this state
         probability = 1.
         Spins = []
         this_E = None
         this_amplitude = None
-        P_average = np.zeros(shape=times.shape)
 
         for atomid in range(0, len(all_spins)):
             Spins.append(all_spins[atomid][current_isotope_ids[atomid]])
@@ -206,29 +206,31 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, field_direction*field_tesla)
 
             # now calculate the polarisation or fourier components
-            P_average, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times, weights=(wx, wy, wz),
-                                                                              fourier=fourier, fourier_2d=fourier_2d,
-                                                                              muon_spin_matrices=(muon_spin_x,
-                                                                                                  muon_spin_y,
-                                                                                                  muon_spin_z),
-                                                                              const=const, probability=probability,
-                                                                              hilbert_dim=hilbert_dim, gpu=gpu,
-                                                                              shutup=shutup)
+            this_pol, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times, weights=(wx, wy, wz),
+                                                                             fourier=fourier, fourier_2d=fourier_2d,
+                                                                             muon_spin_matrices=(muon_spin_x,
+                                                                                                 muon_spin_y,
+                                                                                                 muon_spin_z),
+                                                                             const=const, probability=probability,
+                                                                             hilbert_dim=hilbert_dim, gpu=gpu,
+                                                                             shutup=shutup)
+            P_average += this_pol
 
         else:
             # polycrystalline sample
             if musr_type == musr_type.zero_field:
                 # calculate the polarisation or fourier components
-                P_average, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
-                                                                                  weights=(None, None, None),
-                                                                                  fourier=fourier,
-                                                                                  fourier_2d=fourier_2d,
-                                                                                  muon_spin_matrices=(muon_spin_x,
-                                                                                                      muon_spin_y,
-                                                                                                      muon_spin_z),
-                                                                                  const=const, probability=probability,
-                                                                                  hilbert_dim=hilbert_dim, gpu=gpu,
-                                                                                  shutup=shutup)
+                this_pol, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
+                                                                                 weights=(None, None, None),
+                                                                                 fourier=fourier,
+                                                                                 fourier_2d=fourier_2d,
+                                                                                 muon_spin_matrices=(muon_spin_x,
+                                                                                                     muon_spin_y,
+                                                                                                     muon_spin_z),
+                                                                                 const=const, probability=probability,
+                                                                                 hilbert_dim=hilbert_dim, gpu=gpu,
+                                                                                 shutup=shutup)
+                P_average += this_pol
 
             else:
                 d_theta = math.pi / 10
@@ -255,9 +257,9 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                              weights=(wx, wy, wz),
                                                                                              fourier=fourier,
                                                                                              fourier_2d=fourier_2d,
-                                                                                             muon_spin_matrices=\
-                                                                                             (muon_spin_x, muon_spin_y,
-                                                                                                           muon_spin_z),
+                                                                                             muon_spin_matrices= \
+                                                                                                 (muon_spin_x, muon_spin_y,
+                                                                                                  muon_spin_z),
                                                                                              const=const,
                                                                                              probability=probability,
                                                                                              hilbert_dim=hilbert_dim,
