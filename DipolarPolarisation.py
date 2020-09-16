@@ -513,11 +513,15 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
             # now upload the amplitudes onto the device
             amplitude_device = cp.asarray(this_amplitude, dtype='float32')
 
+            del this_amplitude
+
             for i_time, time in np.ndenumerate(times):
                 if not shutup:
                     print("t=" + str(time))
                 P_average[i_time] += TimeDependence.calc_oscillating_term_gpu(E_diff_device, amplitude_device,
                                                                               len(this_E), time) * probability
+
+            del this_E
 
             del E_diff_device
             del amplitude_device
