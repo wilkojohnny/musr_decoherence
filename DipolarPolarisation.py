@@ -233,8 +233,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 P_average += this_pol
 
             else:
-                d_theta = math.pi / 10
-                d_phi = math.pi / 10
+                d_theta = math.pi / 7
+                d_phi = math.pi / 7
                 N_theta = math.pi / d_theta
                 N_phi = 2 * math.pi / d_phi
                 normalisation_factor = N_phi * math.sin(N_theta*d_theta/2) * \
