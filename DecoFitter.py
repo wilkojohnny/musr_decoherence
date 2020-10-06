@@ -59,7 +59,7 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
     if plot:
         pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
         pyplot.plot(x, fit_func, color=color.cnames['black'])
-        pyplot.ylim((-10, 30))
+        pyplot.ylim((-0, 15))
         pyplot.show()
 
     return fitted_params
