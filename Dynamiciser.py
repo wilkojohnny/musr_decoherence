@@ -37,7 +37,8 @@ def dynamicise(static_function: np.ndarray, t: np.ndarray, dt: float, nu:float) 
     # start the dynamic function at 1
     dynamic_function[0] = 1
 
-    for i_t, this_t in enumerate(t):
+    for i_t in range(1, len(t)):
+        this_t = t[i_t]
         sum = 0
         for i_t1 in range(1, i_t):
             sum += np.exp(-1*nu*(this_t - t[i_t1])) * static_function[i_t - i_t1] * dynamic_function[i_t1]
