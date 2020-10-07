@@ -1,6 +1,7 @@
 """
 Dynamiciser.py -- adds dynamics to any MuSR polarisation function
 By John Wilkinson, 6/10/2020
+git test
 """
 
 import numpy as np
