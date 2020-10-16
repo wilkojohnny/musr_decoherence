@@ -16,10 +16,12 @@ except ModuleNotFoundError:
     no_plot = True
 
 from lmfit import *  # for nls curve fitting
+import re  # for regular expressions
 
 
 def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_time=None,
-        end_time=None, just_plot=False, outfile_location=None, algorithm='leastsq', epsfcn=1e-4):
+        end_time=None, just_plot=False, outfile_location=None, algorithm='leastsq', epsfcn=1e-4,
+        plot_xlim=(0,15), plot_ylim=(None, None)):
     """
     :param muon_data: dict with keys N_F and N_B, the location of the files containing the forward and backward counts,
                       and alpha, OR key 'asymmetry' with the location of the file containing the full asymmetry data
@@ -59,10 +61,94 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
     if plot:
         pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
         pyplot.plot(x, fit_func, color=color.cnames['black'])
-        pyplot.ylim((-0, 15))
+        pyplot.xlim(plot_xlim)
+        pyplot.ylim(plot_ylim)
         pyplot.show()
 
     return fitted_params
+
+
+def fit_dt(muon_data: dict, asymmetry_function, params: Parameters, plot: bool, outfile_location=None,
+           algorithm='leastsq', epsfcn=1e-4, plot_xlim=(0, 30), plot_ylim=(None, None)):
+    """
+    Fit the deadtime correction to F B data, assuming that asymmetry_function is constant
+    :param muon_data: dict with MuSR data, with keys N_F, N_B, alpha
+    :param asymmetry_function: Expected MuSR asymmetry function. None of these parameters will be varied
+    :param params: Parameters for the fit, with keys DT0_{F/B}, DTC2_{F/B} which mean the same as they do in WiMDA
+    :param plot: if True, do a plot of the result
+    :param outfile_location: file to write the corrected asymmetry data to
+    :param algorithm: algorithm for the fit
+    :param epsfcn: fitting algorithm step size
+    :return: lmfit.parameter object of fit result
+    """
+
+    # extract the data into arrays x_f, x_b, N_f, N_b, N_f_error, N_b_error, and dict run_info
+    x_f, N_f, N_f_error, f_run_info = load_count_data(muon_data['N_F'])
+    x_b, N_b, N_b_error, b_run_info = load_count_data(muon_data['N_B'])
+
+    # check both f and b belong to the same data set (crudely)
+    assert f_run_info == b_run_info
+    assert x_f.all() == x_b.all()
+
+    # evaluate the asymmetry function -- (doing it now assumes the parameters are fixed for speed)
+    asym = asymmetry_function(params, x_f)
+
+    # zip together the arrays
+    xx = np.concatenate([x_f, x_b])
+    yy = np.concatenate([N_f, N_b])
+    yy_errerr = np.concatenate([N_f_error, N_b_error])
+
+    # get alpha
+    try:
+        alpha = muon_data['alpha']
+    except KeyError:
+        alpha = 1
+
+    # fit the parameters
+    fit_result = minimize(fb_residual, params, args=(asym, xx, yy, yy_errerr, f_run_info, alpha),
+                          iter_cb=print_iteration, method=algorithm, epsfcn=epsfcn)
+
+    # do a decay + dead time correction with the final parameters
+    fb_higher_orders = get_dt_corrections(fit_result.params)
+    N_dc_f = apply_dead_time_dc(x_f, N_f, f_run_info, fit_result.params['DT0_f'], fb_higher_orders[0]) / np.sqrt(alpha)
+    N_dc_b = apply_dead_time_dc(x_b, N_b, b_run_info, fit_result.params['DT0_b'], fb_higher_orders[1]) * np.sqrt(alpha)
+
+    print(fit_result.message)
+    print(fit_report(fit_result))
+
+    # calculate the new errors on N_f and N_b -- they've changed, as the DT correction has an error associated with it
+    N_dc_f_error = calc_dt_dc_error(x_f, N_f, N_f_error, fit_result.params, f_run_info, 'f') / np.sqrt(alpha)
+    N_dc_b_error = calc_dt_dc_error(x_b, N_b, N_b_error, fit_result.params, b_run_info, 'b') * np.sqrt(alpha)
+
+    # plot (if wanted)
+    if plot:
+        pyplot.errorbar(x_f, N_dc_f, N_dc_f_error, mec='darkred', mfc='darkred', ecolor=color.cnames['red'], marker='.', linestyle='none', label='F')
+        pyplot.errorbar(x_b, N_dc_b, N_dc_b_error, mec='darkblue', mfc='darkblue', ecolor=color.cnames['blue'], marker='.', linestyle='none', label='B')
+        pyplot.legend()
+        pyplot.plot(x_f, fit_result.params['N0']*(1 + 0.01*asym), color='m')
+        pyplot.plot(x_b, fit_result.params['N0']*(1 - 0.01*asym), color='c')
+        pyplot.xlim(plot_xlim)
+        pyplot.ylim(plot_ylim)
+        pyplot.show()
+
+    # if outfiile_location specified, then calculate the asymmetry and save this
+    if outfile_location is not None:
+        # get the data ready
+        A = 100 * (N_dc_f - N_dc_b) / (N_dc_f + N_dc_b)
+        A_err = 200 / (N_dc_b + N_dc_f) ** 2 * np.sqrt((N_dc_f * N_dc_b_error) ** 2 + (N_dc_b * N_dc_f_error) ** 2)
+
+        with open(outfile_location, 'w+') as f:
+            f.write('! Asymmetry data calculated by DecoFitter.py\n')
+            f.write('! Calculated from files ' + muon_data['N_F'] + ' and ' + muon_data['N_B'] + '\n')
+            f.write('!\n! Fitted deadtime parameters: \n')
+            for name, parameter in fit_result.params.items():
+                f.write('! ' + name + ': ' + str(parameter.value) + ' +/- ' + str(parameter.stderr) + '\n')
+            f.write('!\n! t A(t) err\n')
+            for i_t, t in enumerate(x_f):
+                f.write('{:.3f}\t{:.5f}\t{:.5f}\n'.format(t, A[i_t], A_err[i_t]))
+
+    return fit_result.params
+
 
 
 def save_fit(x, fit_function, filename, params):
@@ -106,6 +192,155 @@ def residual(params, fit_function, x, y, yerr):
     """
     y_func = fit_function(params, x)
     return (y - y_func) / yerr
+
+
+def fb_residual(params, asym_func, xx, yy, yy_errerr, run_info, alpha=1):
+    """
+    Calculate the residuals for F B muSR data, for DT fitting
+    :param params: parameters for the fit
+    :param asym_func: asymmetry function
+    :param xx: times the data corresponds to (first half x_F, second x_B)
+    :param yy: array with the first half containing N_F, second N_B
+    :param yy_errerr: errors of yy
+    :param run_info: info of the runs, given by the asym function
+    :param alpha: detector efficiency parameter
+    :return: residuals (asym_func-y)/y_err
+    """
+
+    fb_array_crossover = round(len(xx) / 2)
+
+    # apply the dead time and decay correction
+    dt_higher_orders = get_dt_corrections(params)
+    n_f_dt = apply_dead_time_dc(xx[:fb_array_crossover], yy[:fb_array_crossover], run_info, params['DT0_f'],
+                                dt_higher_orders[0]) / np.sqrt(alpha)
+    n_f_err = yy_errerr[:fb_array_crossover]
+    n_b_dt = apply_dead_time_dc(xx[fb_array_crossover:], yy[fb_array_crossover:], run_info, params['DT0_b'],
+                                dt_higher_orders[1]) * np.sqrt(alpha)
+    n_b_err = yy_errerr[fb_array_crossover:]
+
+    # calcualte the asymmetry function for F and B
+    n_f_func = params['N0'] * (1 + 0.01*asym_func)
+    n_b_func = params['N0'] * (1 - 0.01*asym_func)
+
+    residuals = []
+    for i_n_f_func, this_n_f_func in enumerate(n_f_func):
+        residuals.append((this_n_f_func - n_f_dt[i_n_f_func])/n_f_err[i_n_f_func])
+    for i_n_b_func, this_n_b_func in enumerate(n_b_func):
+        residuals.append((this_n_b_func - n_b_dt[i_n_b_func])/n_b_err[i_n_b_func])
+    return np.array(residuals)*np.exp(-xx/2.19698)
+
+
+def get_dt_corrections(params: Parameters, do_error=False):
+    """
+    turns the params into a list of deadtime corrections for 2nd order and beyond
+    :param params: Parameters object for the fitting parameters, with the >=2nd order corrections being called
+                   DTC{order}_{f/b}. Do not skip any orders, or they will be ignored!
+    :param do_error: set to True to also output the errors in a separate array
+    :return: 2d array, [0][:] containing the forward DT, [1][:] with backward, if do_error also outputs the errors
+    """
+
+    # do f
+    f_corrections = []
+    f_error = []
+    while True:
+        i = len(f_corrections)+2
+        try:
+            this_correction = params['DTC' + str(i) + '_f']
+            f_corrections.append(this_correction)
+            if do_error:
+                f_error.append(this_correction.stderr)
+        except KeyError:
+            break
+
+    # do b
+    b_corrections = []
+    b_error = []
+    while True:
+        i = len(b_corrections)+2
+        try:
+            this_correction = params['DTC' + str(i) + '_b']
+            b_corrections.append(this_correction)
+            if do_error:
+                b_error.append(this_correction.stderr)
+        except KeyError:
+            break
+
+    if do_error:
+        return [f_corrections, b_corrections], [f_error, b_error]
+    else:
+        return [f_corrections, b_corrections]
+
+
+def apply_dead_time_dc(t, N, run_info, DT0, DTn=None):
+    """
+    applies dead time and decay correction to the count data N, in the same way as WIMDA. Does not deal with errors.
+    :param t: time data
+    :param N: count data
+    :param run_info: dict with the MuSR run information, which load_caunt_data() gives out
+    :param DT0: DT0 dead time correction in ns, defined in the same way as WiMDA
+    :param DTn: array of higher-order corrections, defined in the same way as WiMDA
+    :return: the count data corrected for the dead time
+    """
+
+    # this parameter, q, characterises the dead time correction (see lab book 3 page 139)
+    q = 1/(run_info['n_frames']*run_info['n_detectors']*run_info['tres']*1e3)
+
+    dt_denominator = 1 - DT0 * q * N
+
+    if DTn is not None:
+        for i_DT, DTx in enumerate(DTn):
+            dt_denominator -= DTx * (1e3 ** (i_DT + 1)) * (q * N) ** (i_DT + 2)
+
+    N_dt = N * np.exp(t/2.19698) / dt_denominator
+
+    return N_dt
+
+
+def calc_dt_dc_error(t, M, M_err, params, run_info, fb):
+    """
+    calculates the erorrs on measured count rate data M after dead time and decay correction is applied
+    see lab book 3 page 140
+    :param t: time data
+    :param M:  measured count rate data, *without decay or dead time corrections*
+    :param M_err: error in measured count rate
+    :param params: parameter array containing all the data
+    :param run_info: run info dictionary
+    :param fb: 'f' to calculate for f detectors, 'b' for backward
+    :return: error in the dead time and decay corrected counts
+    """
+
+    # work out what dt corrections we have, and place them and the errors into an array
+    dt_corrections, dt_errors = get_dt_corrections(params, do_error=True)
+    if fb=='f':
+        dt_corrections = dt_corrections[0]
+        dt_errors = dt_errors[0]
+    else:
+        dt_corrections = dt_corrections[1]
+        dt_errors = dt_errors[1]
+
+    N = apply_dead_time_dc(t, M, run_info, params['DT0_'+fb], dt_corrections)
+
+    N_denominator = M * np.exp(t / 2.19698) / N
+
+    # this parameter, q, characterises the dead time correction (see lab book 3 page 139)
+    q = 1/(run_info['n_frames']*run_info['n_detectors']*run_info['tres']*1e3)
+
+    dN_dM = 1
+    for i_dt_correction, dt_correction in enumerate(dt_corrections):
+        dN_dM += (i_dt_correction + 1) * dt_correction * 1e3 ** (i_dt_correction + 1) * (q * M) ** (i_dt_correction + 2)
+    dN_dM *= np.exp(t / 2.19698) / (N_denominator ** 2)
+
+    dN_dDTO = q * M * N / N_denominator
+
+    dN_dDTCi = [N * (1e3 ** (i+1) * (q * M) ** (i+2)) / N_denominator for i, _ in enumerate(dt_corrections)]
+
+    err_sq = (dN_dM * M_err) ** 2 + (dN_dDTO * params['DT0_'+fb].stderr) ** 2
+    for i_dN_dTC, this_dN_dTC in enumerate(dN_dDTCi):
+        err_sq += (this_dN_dTC * dt_errors[i_dN_dTC]) ** 2
+
+    err = np.sqrt(err_sq)
+
+    return err
 
 
 def load_muon_data(muon_data: dict, start_time=None, end_time=None, encoding='iso-8859-1'):
@@ -186,4 +421,42 @@ def load_muon_data(muon_data: dict, start_time=None, end_time=None, encoding='is
         return np.array(x), np.array(y), np.array(y_error)
 
 
+def load_count_data(file_name, encoding='iso-8859-1'):
+    """
+    Load raw counts data
+    :param file_name: filename of the file which contains the raw counts data
+    :return: arrays x, n_counts, err_n_counts, run_info (with keys 'n_frames', 'n_detectors', 'tres')
+    """
+
+    # extract the run information and stick it in run_info
+    run_info = {}
+
+    # do the regex
+    number_re = re.compile(r'[\d.]+')
+
+    x = []
+    y = []
+    y_err = []
+    with open(file_name, 'r', encoding=encoding) as file:
+        # for each line in the file
+        for file_line in file.readlines():
+            if file_line.startswith('!'):
+                # if the file line talks about histograms, get the number of detectors out (and /2 as F and B), and tres
+                if 'Histograms' in file_line:
+                    hist_data = number_re.findall(file_line)
+                    run_info.update({'n_detectors': round(int(hist_data[1])/2)})
+                    run_info.update({'tres': float(hist_data[-2])*1e-6})
+                # get the number of frames from the line about 'Events'
+                if 'Events' in file_line:
+                    event_data = number_re.findall(file_line)
+                    run_info.update({'n_frames': int(event_data[-2])})
+            else:
+                # now load the data
+                data = file_line.split()
+
+                x.append(float(data[0]))
+                y.append(float(data[1]))
+                y_err.append(float(data[2]))
+
+    return np.array(x), np.array(y), np.array(y_err), run_info
 
