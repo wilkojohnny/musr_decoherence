@@ -7,11 +7,11 @@ print = functools.partial(print, flush=True)
 
 import subprocess  # gets git version
 from datetime import datetime  # allows one to print out date and time
-import Hamiltonians # allows one to calculate Hamiltonians
-import TimeDependence
-from MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
+from . import Hamiltonians # allows one to calculate Hamiltonians
+from . import TimeDependence
+from .MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
 import time as human_time
-from TCoord3D import TCoord3D as coord  # coordinate utilities
+from .TCoord3D import TCoord3D as coord  # coordinate utilities
 import numpy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 import math
@@ -133,7 +133,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         try:
             import cupy as cp
         except ImportError:
-            print('Can\'t find CuPy module. Have you set up CUDA?')
+            print('Can\'t find CuPy module. Have you set up CUDA? Try running pip install ./[gpu]')
             gpu = False
 
     # type of calculation - can't do fourier2d if not fourier

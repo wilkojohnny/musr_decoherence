@@ -1,8 +1,8 @@
 # DipolePolarisation.py -- calculates sum_{nnnness} [n atoms in nnnness]/r_{nnnness}^6, until convergence
 # John Wilkinson 16/12/19
-import AtomObtainer  # for nnnfinder
+from . import AtomObtainer  # for nnnfinder
 from ase import Atoms, build
-import MDecoherenceAtom
+from . import MDecoherenceAtom
 import numpy as np
 import copy
 

@@ -1,19 +1,12 @@
 # Fit CaF2 data with DecoFitter.py
 # works with Decoherence_calculator version>ff1a392386b66178c63dbe80dbfe6e7c5b935286
 
-# add DecoCalc to PATH
-import os
-pwd = os.path.dirname(__file__)
-deco_path = os.path.join(pwd, '../../') # this should be the path of Decoherence_calculator
-import sys
-sys.path.append(deco_path)
-
-from DecoFitter import *
-import AtomObtainerN as AO
+from musr_decoherence.DecoFitter import *
+from musr_decoherence import AtomObtainerN as AO
+from musr_decoherence import DipolarPolarisation
 from ase.io import read
 from ase import build
 import numpy as np
-import DipolarPolarisation
 from lmfit import Parameters
 
 cif_file = '../CaF2.cif'

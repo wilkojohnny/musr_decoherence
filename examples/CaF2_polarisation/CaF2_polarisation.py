@@ -4,20 +4,12 @@
 import functools
 print = functools.partial(print, flush=True)
 
-# add DecoCalc to PATH
-import os
-pwd = os.path.dirname(__file__)
-deco_path = os.path.join(pwd, '../../')  # this should be the path of Decoherence_calculator
-import sys
-sys.path.append(deco_path)
+import musr_decoherence.AtomObtainerN as AO
+from musr_decoherence import DipolarPolarisation
 
-from DecoFitter import *
-import AtomObtainerN as AO
 from ase.io import read
 from ase import build
 import numpy as np
-import DipolarPolarisation
-from TCoord3D import TCoord3D as coord
 
 
 def main():
@@ -33,6 +25,7 @@ def main():
     # get the muon position visually -- to do this, CTRL+click the two F atoms the
     # muon sits between.
     # muon_position, nnindices = AO.get_muon_pos_nn_visually(CaF2_atoms)
+    # ^^ but instead of doing the above every time, you can also just type in the muon location manually
     nnindices = [4, 9]
     muon_position = np.array([2.722, 1.361, 4.084])
 
@@ -55,7 +48,7 @@ def main():
     DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=muon_sample_polarisation,
                                                   plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=True, shutup=False,
                                                   times=np.arange(0, 20, 0.1), outfile_location=output_file_name,
-                                                  musr_type=DipolarPolarisation.musr_type.TF, field=20)
+                                                  musr_type=DipolarPolarisation.musr_type.ZF)
     return 0
 
 

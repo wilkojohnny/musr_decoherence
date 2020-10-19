@@ -1,6 +1,6 @@
 # Hamiltonians.py - Calculate decoherence of muon state in any lattice with any structure
 
-import TCoord3D as coord  # 3D coordinates class
+from . import TCoord3D as coord  # 3D coordinates class
 import numpy as np  # for matrices
 import scipy.sparse as sparse  # for sparse matrices
 

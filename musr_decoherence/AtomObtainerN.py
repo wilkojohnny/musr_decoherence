@@ -15,8 +15,8 @@ from ase import build
 from ase.gui.gui import GUI
 from ase.gui.images import Images
 
-from MDecoherenceAtom import TDecoherenceAtom as Matom  # import class for decoherence atom
-from TCoord3D import TCoord3D as coord
+from .MDecoherenceAtom import TDecoherenceAtom as Matom  # import class for decoherence atom
+from .TCoord3D import TCoord3D as coord
 
 
 def get_linear_fmuf_atoms(ase_atoms: Atoms, muon_position: np.ndarray, nnnness: int = 2, squish_radii: list = None,
@@ -122,12 +122,13 @@ def ase_nnnfinder(nnnness: int, pwo_file: str = None, atoms_mu: Atoms = None, sq
         before_atoms_mu = io.read(pwo_file, 0)
 
     # find out if we're using the symbol H or mu for the muon
+    # trust me, there is not an easier way!
     muon_symbol = None
     for i_atom, this_atom in enumerate(atoms_mu):
         if this_atom.symbol == 'H':
             muon_symbol = 'H'
-        elif this_atom.symbol == 'mu':
-            muon_symbol = 'mu'
+        elif this_atom.symbol == 'X':
+            muon_symbol = 'X'
             break
 
     # before we faff with a supercell (which is actually a super-supercell, if we're doing a DFT calculation)
@@ -213,7 +214,7 @@ def ase_nnnfinder(nnnness: int, pwo_file: str = None, atoms_mu: Atoms = None, sq
     for [atom_cellID, mu_at_dist] in mu_distances:
         # see if we are in a new sphere of nnnness
         if abs(current_nnness_dist - mu_at_dist) > nn_tol or (not nnnness_shells
-                                                              and supercell_onemuon[atom_cellID].symbol!='mu'):
+                                                              and supercell_onemuon[atom_cellID].symbol!='X'):
             # we are in a new nnnness sphere -- so check it's wanted
             current_nnnness += 1
             if current_nnnness > nnnness:
@@ -226,7 +227,7 @@ def ase_nnnfinder(nnnness: int, pwo_file: str = None, atoms_mu: Atoms = None, sq
     # do squishification -- indexes for mu_distances and nearest_neighbour_atoms are the same
     for i_nearest_neighbour in range(0, len(nearest_neighbour_atoms)):
         # if the squish radius is not None, and this atom is not a muon
-        if squish_radii is not None and nearest_neighbour_atoms[i_nearest_neighbour].symbol != 'mu':
+        if squish_radii is not None and nearest_neighbour_atoms[i_nearest_neighbour].symbol != 'X':
             # squish radius for this nnnness (nnnness_atoms defines this)
             current_nnnness = nnnness_atoms[i_nearest_neighbour]
             this_squish = None
@@ -296,7 +297,7 @@ def add_muon_to_aseatoms(atoms: Atoms, muon_position: np.ndarray, nn_indices: li
     # make a copy of atoms
     atoms = copy.deepcopy(atoms)
 
-    muon_atom_obj = atom.Atom('mu', muon_position)
+    muon_atom_obj = atom.Atom('X', muon_position)
     atoms.append(muon_atom_obj)
 
     # enforce nnnness

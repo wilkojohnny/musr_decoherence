@@ -3,16 +3,9 @@
 import functools
 print = functools.partial(print, flush=True)
 
-# add DecoCalc to PATH
-import os
-pwd = os.path.dirname(__file__)
-deco_path = os.path.join(pwd, '../../')  # this should be the path of Decoherence_calculator
-import sys
-sys.path.append(deco_path)
-
-import DipolarPolarisation
-from MDecoherenceAtom import TDecoherenceAtom as atom
-from TCoord3D import TCoord3D as coord
+from musr_decoherence import DipolarPolarisation
+from musr_decoherence.MDecoherenceAtom import TDecoherenceAtom as atom
+from musr_decoherence.TCoord3D import TCoord3D as coord
 import numpy as np
 import NaF_EFG
 
