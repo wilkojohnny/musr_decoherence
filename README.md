@@ -1,7 +1,8 @@
 # musr-decoherence
 Calculator for predicting the dipolar coupling between muons and nuclei in MuSR experiments, and to analyse the 'decoherence' caused by multiple nuclei's interactions with the muon.
 
-## Installation
+## Installation
+
 Install the package with pip -- clone this repository, cd to this folder and run:
 ```bash
 pip install ./
