@@ -310,7 +310,7 @@ def add_muon_to_aseatoms(atoms: Atoms, muon_position: np.ndarray, nn_indices: li
 
 
 def add_muon_to_aseatoms_bent(ase_atoms: Atoms, fluorines: list, plane_atom, fmuf_angle: float = 180,
-                              swing_angle: float = 0) -> Atoms:
+                              swing_angle: float = 0, enforce_nnf_dist: float = 0) -> Atoms:
     """
     Adds a muon to ase atoms as a bent F--mu--F bond
     :param ase_atoms: ASE atoms of the structure, without the muon
@@ -319,6 +319,8 @@ def add_muon_to_aseatoms_bent(ase_atoms: Atoms, fluorines: list, plane_atom, fmu
                              or an angle swing_angle away from. (can be int of atom in ase_atoms, or coords)
     :param fmuf_angle: the F--mu--F bond angle
     :param swing_angle: the angle the planar F--mu--F molecule makes with the 2F+plane_atom plane
+    :param enforce_nnf_dist: force the fluorine nuclei to be closer to the muon (use to make sure that they are the
+                            nearest-neighbours).
     :return: ASE atoms, with muon
     """
 
@@ -358,6 +360,11 @@ def add_muon_to_aseatoms_bent(ase_atoms: Atoms, fluorines: list, plane_atom, fmu
         assert False
 
     mu_atoms = add_muon_to_aseatoms(atoms=ase_atoms, muon_position=mu_position.tonumpyarray())
+
+    if enforce_nnf_dist > 0:
+        print('WARNING -- setting enforce_nn_dist may lead to inaccurate next-nearest-neighbours. Use with caution.')
+        mu_atoms.set_distance(fluorines[0], -1, enforce_nnf_dist, fix=1)
+        mu_atoms.set_distance(fluorines[1], -1, enforce_nnf_dist, fix=1)
 
     # mu_img = Images()
     # mu_img.initialize([mu_atoms])

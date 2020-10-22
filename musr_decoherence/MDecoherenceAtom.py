@@ -181,7 +181,8 @@ nucleon_properties = {
           "gyromag_ratio": 267.512,
           "abundance": 1,
           "Q": 0,
-          "charge": +1},
+          "charge": +1
+          },
     "Li": {"II": np.array([2, 3]),
            "gyromag_ratio": np.array([6.2655, 16.5465])*2*3.14145926,
            "abundance": np.array([0.0742, 0.9258]),
@@ -189,6 +190,13 @@ nucleon_properties = {
            "Q": np.array([-0.0008, -0.045]),
            "anti_shielding": -0.2570
            },
+    "B": {"II": 3,
+          "gyromag_ratio": 85.8289,
+          "abundance": 1,
+          "charge": +3,
+          "Q": 0.041,
+          "anti_shielding": -0.144
+          },
     "F": {"II": 1,
           "gyromag_ratio": 251.713,
           "abundance": 1,
