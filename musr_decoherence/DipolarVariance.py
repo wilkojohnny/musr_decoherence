@@ -209,9 +209,8 @@ def calc_dipolar_second_moment_sums(unit_cell: Atoms, squish_nnnness: list, max_
     # order all the atoms by distance from the muon, if it is wanted...
     muon_distances = []
     for i_atom, atom in enumerate(supercell):
-        if atom.symbol in included_atoms:
-            muon_distance = supercell.get_distances(-1, [i_atom])
-            muon_distances.append((atom.symbol, muon_distance))
+        muon_distance = supercell.get_distances(-1, [i_atom])
+        muon_distances.append((atom.symbol, muon_distance))
 
     # sort the muon distances
     muon_distances = sorted(muon_distances, key=lambda element: element[1])
@@ -239,12 +238,15 @@ def calc_dipolar_second_moment_sums(unit_cell: Atoms, squish_nnnness: list, max_
         if current_nnnness <= start_nnnness + 1:
             [print('n', end='') for _ in range(0, current_nnnness)]
             print(': ' + symbol + ' at distance '+ str(distance_from_muon), end='\n')
+        if not symbol in included_atoms:
+            continue
         # do we care about this nnnness?
         if current_nnnness >= start_nnnness:
             # we do -- so calculate the lambda contribution for these up to the distance required
             try:
                 gyromagnetic_ratio = MDecoherenceAtom.nucleon_properties[symbol]["gyromag_ratio"]
             except KeyError:
+                print('Atom {} cannot be found in the database. The magnetic properties will be ignored.'.format(symbol)) 
                 continue
             II = MDecoherenceAtom.nucleon_properties[symbol]["II"]
             I = II / 2
