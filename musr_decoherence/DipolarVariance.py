@@ -174,7 +174,7 @@ def calc_dipolar_second_moment_sums(unit_cell: Atoms, squish_nnnness: list, max_
     # find where the muon is in atoms object
     muon_unit_cell_id = None
     for atom_id, atom in enumerate(unit_cell):
-        if atom.symbol == 'mu':
+        if atom.symbol == 'X':
             muon_unit_cell_id = atom_id
         elif atom.symbol == 'H' and muon_unit_cell_id is None:
             muon_unit_cell_id = -1*atom_id
@@ -199,7 +199,7 @@ def calc_dipolar_second_moment_sums(unit_cell: Atoms, squish_nnnness: list, max_
 
     # put the muon back in
     muon_pos_supercell_scaled = (muon_scaled_position + (supercell_dim - 1) / 2) / supercell_dim
-    muon_supercell = Atoms(symbols=['mu'], scaled_positions=[muon_pos_supercell_scaled], cell=supercell.get_cell())
+    muon_supercell = Atoms(symbols=['X'], scaled_positions=[muon_pos_supercell_scaled], cell=supercell.get_cell())
     muon_supercell_muon = muon_supercell[0]
     supercell.append(muon_supercell_muon)
 
@@ -242,7 +242,10 @@ def calc_dipolar_second_moment_sums(unit_cell: Atoms, squish_nnnness: list, max_
         # do we care about this nnnness?
         if current_nnnness >= start_nnnness:
             # we do -- so calculate the lambda contribution for these up to the distance required
-            gyromagnetic_ratio = MDecoherenceAtom.nucleon_properties[symbol]["gyromag_ratio"]
+            try:
+                gyromagnetic_ratio = MDecoherenceAtom.nucleon_properties[symbol]["gyromag_ratio"]
+            except KeyError:
+                continue
             II = MDecoherenceAtom.nucleon_properties[symbol]["II"]
             I = II / 2
             # dont do isotopes for now

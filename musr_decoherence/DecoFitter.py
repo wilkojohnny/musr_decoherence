@@ -408,15 +408,15 @@ def load_muon_data(muon_data: dict, start_time=None, end_time=None, encoding='is
                 n_f_counts = float(n_f[1])
                 n_b_counts = float(n_b[1])
                 try:
-                    asymmetry = 100*(n_b_counts - alpha*n_f_counts)/(n_b_counts + alpha*n_f_counts)
+                    asymmetry = 100*(n_f_counts - alpha*n_b_counts)/(n_f_counts + alpha*n_b_counts)
                 except ZeroDivisionError:
                     x.pop(-1)
                     continue
                 y.append(asymmetry)
                 err_n_f = float(n_f[2])
                 err_n_b = float(n_b[2])
-                asymmetry_error = 2*100*alpha/(n_b_counts + alpha*n_f_counts) ** 2 *\
-                                  np.sqrt((n_f_counts*err_n_b) ** 2 + (n_b_counts*err_n_f) ** 2)
+                asymmetry_error = 2*100*alpha/(n_f_counts + alpha*n_b_counts) ** 2 *\
+                                  np.sqrt((n_b_counts*err_n_f) ** 2 + (n_f_counts*err_n_b) ** 2)
                 y_error.append(asymmetry_error)
         return np.array(x), np.array(y), np.array(y_error)
 

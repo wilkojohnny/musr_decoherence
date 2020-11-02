@@ -3,8 +3,8 @@
 # 14/4/19 - Extended for xtl files (these can be exported from CIF files with VESTA.)
 # 30/3/20 - DEPRECIATED -- use AtomObtainerN.py instead of this from now on
 
-from MDecoherenceAtom import TDecoherenceAtom as atom  # import class for decoherence atom
-import TCoord3D as coord  # 3D coordinates class
+from .MDecoherenceAtom import TDecoherenceAtom as atom  # import class for decoherence atom
+from . import TCoord3D as coord  # 3D coordinates class
 import sys  # for user input
 import numpy as np  # for numpy arrays
 from enum import Enum
