@@ -217,25 +217,24 @@ nucleon_properties = {
            "Q": 0.149,
            "charge": +3,
            "anti_shielding": 2.3},
-    "P":  {"II": 2,
+    "P":  {"II": 1,
            "gyromag_ratio": 108.2907,
            "abundance": 1,
            "Q": 0,
            "charge": +5, # from KPF6 -- but probably not very accurate, as its not very ionic
            "anti_shielding": 0},
-# removed K as the effect is negligible
-#    "K":  {"II": 3,
-#           "gyromag_ratio": 12.0911,  # weighted sum of two biggest isotopes
-#           "abundance": 1, # this is not strictly true, but go with it for now.
-#           "Q": 0, # for now ignore quadrupoles
-#           "charge": +1,
-#           "anti_shielding": 0}, # ignoring quadrupoles
+   "K":  {"II": 3,
+          "gyromag_ratio": 12.4809,
+          "abundance": 1, # this is not strictly true, but go with it for now.
+          "Q": +0.049,
+          "charge": +1,
+          "anti_shielding": 15},
     "Sc": {"II": 7,
            "gyromag_ratio": 64.9895,
            "abundance": 1,
            "Q": -0.22,
            "charge": +3,
-           "anti_shielding": +11.2 # from PRA *8* 1169 (1973)
+           "anti_shielding": +11.2  # from PRA *8* 1169 (1973)
     },
     "Y": {"II": 1,
           "gyromag_ratio": -13.1067,
