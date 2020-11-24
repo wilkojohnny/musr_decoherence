@@ -13,7 +13,7 @@ from . import MDecoherenceAtom
 
 def add_muon_to_aseatoms(ase_atoms: atoms, theta: float = 180, phi: float = 0, nn_indices: list = None,
                          muon_position: np.ndarray = None, plane_atom_index: int = None,
-                         plane_atom_position: np.ndarray = None) -> atoms:
+                         plane_atom_position: np.ndarray = None, midpoint=0.5) -> atoms:
     """
     adds a muon to ase_atoms
     :param ase_atoms: ASE atoms of the crystal the muon is going to be placed into
@@ -27,6 +27,8 @@ def add_muon_to_aseatoms(ase_atoms: atoms, theta: float = 180, phi: float = 0, n
                              and plane_atom_position.
     :param plane_atom_position: np array of position of the plane_atom (doesn't actually need to be a position of an
                                 atom per se, but useful if it is. Do not define this and the index.
+    :param midpoint: weighting of the midpoint to the two nnindices. 0 puts the muon on nn_indices[0], 1 puts it on
+                     nn_indices[2]. 0.5 puts it in between the two.
     :return: ase_atoms with the muon
     """
 
@@ -65,7 +67,8 @@ def add_muon_to_aseatoms(ase_atoms: atoms, theta: float = 180, phi: float = 0, n
             plane_atom_position_c = coord(plane_atom_position[0], plane_atom_position[1], plane_atom_position[2])
 
             muon_position = get_bent_muon_position(nn_position_1=nn_position_1, nn_position_2=nn_position_2,
-                                                   plane_position=plane_atom_position_c, theta=theta, phi=phi)
+                                                   plane_position=plane_atom_position_c, theta=theta, phi=phi,
+                                                   midpoint=midpoint)
 
             muon_position = muon_position.tonumpyarray()
 
@@ -81,7 +84,7 @@ def add_muon_to_aseatoms(ase_atoms: atoms, theta: float = 180, phi: float = 0, n
 
 
 def get_bent_muon_position(nn_position_1: coord, nn_position_2: coord, plane_position: coord, theta: float,
-                           phi: float) -> coord:
+                           phi: float, midpoint: float) -> coord:
     """
     Get the position of the muon to create a bond of angle theta with nn_position_1 and nn_position_2, protruding
     out from plane_position. then rotates this bond by an angle theta wrt the axis nn_1-> nn_2.
@@ -92,11 +95,12 @@ def get_bent_muon_position(nn_position_1: coord, nn_position_2: coord, plane_pos
                            the muon away from
     :param theta: F--mu--F angle, in degrees
     :param phi: angle to rotate the F--mu--F bond around
+    :param midpoint: the midpoint of nn_position_1 and nn_position_2 will be (nn_pos_1*midpoint+nn_pos_2*(1-midpoint))
     :return: TCoord3D of the position of the muon
     """
 
     # calcaulate mu_protrude (lambda in lab book; but I can't call it that because python...)
-    m = (nn_position_2 - nn_position_1) * 0.5
+    m = (nn_position_2 - nn_position_1) * midpoint
     m_sq = m * m
     # import pdb; pdb.set_trace()
     p_m = (nn_position_1 + m - plane_position).rhat()
