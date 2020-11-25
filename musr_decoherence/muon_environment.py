@@ -417,8 +417,9 @@ def calculate_quadrupoles(atoms_mu: atoms, dominant_indices: list, unperturbed_a
     return efgs, nn_quad_indices
 
 
-def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor: float = None) \
-        -> atoms:
+def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor: float = None,
+                         atoms_mu: atoms = None, nn_indices: list = None, unperturbed_atoms : atoms = None,
+                         max_exact_distance = 150) -> atoms:
     """
     model the further nuclei by drawing in the furthest away nuclei by a factor draw_in_factor
     :param nn_atoms_mu: nn_atoms, including muon, which have been extracted for the calculation
@@ -426,10 +427,14 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
                      -2 last and second-to-last, etc, or 2=nnn, 3=nnnn
     :param draw_in_factor: factor to draw atoms at nn_start and beyond in by. If not defined, tries to calculate it
                            automatically
+    :param atoms_mu: ASE atoms, including muon, without the nnns extracted (only if not providing draw_in_factor)
+    :param nn_indices: the indices of the nuclei in ase_atoms_mu to run the calculation on. The last index MUST
+                       correspond to the muon. (only if not providing draw_in_factor)
+    :param unperturbed_atoms: ASE atoms before muon perturbations were included (only if not providing draw_in_factor)
+    :param max_exact_distance: largest distance to calculate the second moment at -- beyond this it just does an
+                               integral (only if not providing draw_in_factor)
     :return: ASE atoms with the further nuclei modelled by drawing in the last nearest-neighbours
     """
-
-    # TODO: work out the draw_in_factor automatically
 
     # calculate all the distances between the muon and the nuclei
     mu_distances = [[i for i in range(0, len(nn_atoms_mu))],
@@ -457,6 +462,16 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
         nn_start = len(nn_ids) + nn_start
         assert nn_start > 0
 
+    if draw_in_factor is None:
+        # convert the indices in nn_atoms_mu to those in atoms_mu
+        atoms_mu_indices = [[nn_indices[i] for i in this_nn_shell] for this_nn_shell in nn_ids]
+        draw_in_factor = calculate_draw_in_factor(atoms_mu=atoms_mu, nn_indices=nn_indices,
+                                                  unperturbed_atoms=unperturbed_atoms,
+                                                  draw_in_atoms=atoms_mu_indices[nn_start:],
+                                                  max_exact_distance=max_exact_distance)
+
+    print('draw_in_factor calculated as {:.4f} '.format(draw_in_factor))
+
     for nnnness in range(nn_start, len(nn_ids)):
         current_nnshell_atoms = nn_ids[nnnness]
         nnshell_distance = nn_atoms_mu.get_distance(-1, current_nnshell_atoms[0], mic=False)
@@ -464,6 +479,88 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
          for i, _ in enumerate(current_nnshell_atoms)]
 
     return nn_atoms_mu
+
+
+def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atoms: atoms, draw_in_atoms: list,
+                             max_exact_distance: float = 50) -> float:
+    """
+    calculate the drawing-in factor of the nuclei beyond a certain next-nearest-neighbour shell
+    :param atoms_mu: ASE atoms, including muon, without the nnns extracted
+    :param nn_indices: the indices of the nuclei in ase_atoms_mu to run the calculation on. The last index MUST
+                       correspond to the muon.
+    :param unperturbed_atoms: ASE atoms before muon perturbations were included
+    :param draw_in_atoms: list of indexes to draw in (these must also be in nn_indices -- otherwise whats the point?!
+    :param max_exact_distance: largest distance to calculate the second moment at -- beyond this it just does an
+                               integral
+    :return: the drawing-in factor to take into account the rest of the nuclei.
+    """
+
+    # turn draw_in_atoms into a 1D list if it is 2D
+    if isinstance(draw_in_atoms[0], list):
+        draw_in_atoms = [j for sub in draw_in_atoms for j in sub]
+
+    # work out which atoms to ignore (i.e the ones in nn_indices but not in draw_in_atoms)
+    ignored_atoms = set(nn_indices) - set(draw_in_atoms)
+
+    # build a supercell
+    no_supercells = int(np.ceil(max_exact_distance / min(atoms_mu.cell.lengths())))
+    atoms_supercell = make_supercell(atoms_mu, unperturbed_atoms, unperturbed_supercell=no_supercells,
+                                     small_output=True)
+
+    nuclear_symbols, nuclear_positions = tuple(map(list, zip(*atoms_supercell)))
+
+    # check nn_index[-1] is the muon index, and save this
+    assert atoms_mu[nn_indices[-1]].symbol == 'X'
+    muon_index = nn_indices[-1]
+    muon_position = nuclear_positions[muon_index]
+
+    mu_distances_sq = np.array([(muon_position[0] - nuc_pos[0]) ** 2 + (muon_position[1] - nuc_pos[1]) ** 2
+                                + (muon_position[2] - nuc_pos[2]) ** 2 for nuc_pos in nuclear_positions])
+    mu_distances = np.sqrt(mu_distances_sq)
+
+    all_second_moment = 0
+    squish_second_moment = 0
+
+    # calculate the dipolar second moment for each nucleus in this supercell, closer than max_exact_distance
+    for id, distance in enumerate(mu_distances):
+        symbol = nuclear_symbols[id]
+        if id in ignored_atoms:
+            continue
+        if distance > max_exact_distance:
+            continue
+
+        II = MDecoherenceAtom.nucleon_properties[symbol]['II']
+        I = II / 2
+        gyromag_ratio = MDecoherenceAtom.nucleon_properties[symbol]['gyromag_ratio']
+
+        # dont do isotopes for now
+        assert MDecoherenceAtom.nucleon_properties[symbol]["abundance"] == 1
+
+        this_second_moment = I * (I + 1) * (gyromag_ratio ** 2) / (distance ** 6)
+
+        all_second_moment += this_second_moment
+
+        if id in nn_indices:
+            squish_second_moment += this_second_moment
+
+    # add on the integral to get the total second moment
+    density = unperturbed_atoms.get_number_of_atoms() / unperturbed_atoms.get_volume()
+    unit_cell_mag_factor = 0
+    for this_atom in unperturbed_atoms:
+        symbol = this_atom.symbol
+        I = MDecoherenceAtom.nucleon_properties[symbol]['II'] / 2
+        gyromag_ratio = MDecoherenceAtom.nucleon_properties[symbol]['gyromag_ratio']
+
+        unit_cell_mag_factor += I * (I + 1) * (gyromag_ratio ** 2)
+    unit_cell_mag_factor /= unperturbed_atoms.get_number_of_atoms()
+
+    integral = 4 * np.pi / (3 * max_exact_distance) * density * unit_cell_mag_factor
+    all_second_moment += integral
+
+    # use this to calculate the drawing in factor
+    draw_in_factor = (squish_second_moment / all_second_moment) ** (1/6)
+
+    return draw_in_factor
 
 
 def aseatoms_to_tdecoatoms(atoms_mu: atoms, muon_array_id: int = -1, muon_centred_coords: bool = True,
