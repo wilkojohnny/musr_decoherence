@@ -469,8 +469,7 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
                                                   unperturbed_atoms=unperturbed_atoms,
                                                   draw_in_atoms=atoms_mu_indices[nn_start:],
                                                   max_exact_distance=max_exact_distance)
-
-    print('draw_in_factor calculated as {:.4f} '.format(draw_in_factor))
+        print('draw_in_factor calculated as {:.4f} '.format(draw_in_factor))
 
     for nnnness in range(nn_start, len(nn_ids)):
         current_nnshell_atoms = nn_ids[nnnness]
