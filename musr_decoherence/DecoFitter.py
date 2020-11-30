@@ -456,7 +456,11 @@ def load_count_data(file_name, encoding='iso-8859-1'):
 
                 x.append(float(data[0]))
                 y.append(float(data[1]))
-                y_err.append(float(data[2]))
+
+                this_error = float(data[2])
+                if this_error == 0:
+                    this_error = max(1e-3, np.sqrt(y[-1]))
+                y_err.append(this_error)
 
     return np.array(x), np.array(y), np.array(y_err), run_info
 
