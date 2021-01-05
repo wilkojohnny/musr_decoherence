@@ -252,5 +252,9 @@ nucleon_properties = {
     "Y": {"II": 1,
           "gyromag_ratio": -13.1067,
           "abundance": 1
-    }
+    },
+    "Pb": {"II": 0,
+           "gyromag_ratio": 0,
+           "abundance": 1,
+    },
 }
