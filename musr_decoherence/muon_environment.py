@@ -304,11 +304,11 @@ def get_dominant_nuclei(atoms_mu: atoms, nn_cutoff: int or None = None, hilbert_
     surviving_ids = []
     # go up in interactions, until we hit either the total hilbert size or the the nn_cutoff
     for [atom_id, interaction_size, hilbert_size] in mu_interactions:
-        if interaction_size < current_interaction_size:
+        if abs(interaction_size - current_interaction_size) > 0.01:
             # new interaction shell
             current_interaction_shell += 1
             current_interaction_size = interaction_size
-            if nn_cutoff is not None and current_interaction_shell > nn_cutoff:
+            if nn_cutoff is not None and current_interaction_shell > nn_cutoff :
                 break
         elif total_hilbert_size*hilbert_size > hilbert_cutoff:
             print('WARNING -- Breaking up a shell of nuclei with the hilbert cutoff. Maybe change the hilbert size?')
