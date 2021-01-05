@@ -83,6 +83,29 @@ def add_muon_to_aseatoms(ase_atoms: atoms, theta: float = 180, phi: float = 0, n
     return ase_atoms
 
 
+def add_frenkel_muon(ase_atoms: atoms, index) -> atoms:
+    """
+    Add a Mu- into the structure in place of atom ase_atoms[index], to simulate a frenkel defect
+    :param ase_atoms: ASE atoms, unperturbed
+    :param index: index of the atom in ase_atoms to replace with the muon
+    :return: ASE atoms of the atoms - defect + Mu-
+    """
+
+    # make a local copy of the atoms
+    atoms_mu = copy.deepcopy(ase_atoms)
+
+    # get the position of the defect
+    pos = ase_atoms[index].position
+
+    # remove the atom at index
+    del atoms_mu[index]
+
+    # add the muon
+    atoms_mu.append(atom.Atom('X', position=pos))
+
+    return atoms_mu
+
+
 def get_bent_muon_position(nn_position_1: coord, nn_position_2: coord, plane_position: coord, theta: float,
                            phi: float, midpoint: float) -> coord:
     """
