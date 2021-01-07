@@ -310,8 +310,8 @@ def get_dominant_nuclei(atoms_mu: atoms, nn_cutoff: int or None = None, hilbert_
             for i_isotope in range(0, len(nuclear_properties['II'])):
                 moment += abs(nuclear_properties['gyromag_ratio'][i_isotope]) * nuclear_properties['II'][i_isotope] \
                           * nuclear_properties['abundance'][i_isotope]
-                if nuclear_properties['II'] + 1 > hilbert_size:
-                    hilbert_size = nuclear_properties['II'] + 1
+                if nuclear_properties['II'][i_isotope] + 1 > hilbert_size:
+                    hilbert_size = nuclear_properties['II'][i_isotope] + 1
         else:
             moment = abs(nuclear_properties['gyromag_ratio']) * nuclear_properties['II']
             hilbert_size = nuclear_properties['II'] + 1
@@ -555,10 +555,17 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
         I = II / 2
         gyromag_ratio = MDecoherenceAtom.nucleon_properties[symbol]['gyromag_ratio']
 
-        # dont do isotopes for now
-        assert MDecoherenceAtom.nucleon_properties[symbol]["abundance"] == 1
-
-        this_second_moment = I * (I + 1) * (gyromag_ratio ** 2) / (distance ** 6)
+        # sort out the isotopes
+        if isinstance(MDecoherenceAtom.nucleon_properties[symbol]["abundance"], np.ndarray):
+            this_second_moment = 0
+            for i_isotope in range(0, len(II)):
+                I = II[i_isotope] / 2
+                this_gyromag_ratio = gyromag_ratio[i_isotope]
+                this_abundnance = MDecoherenceAtom.nucleon_properties[symbol]["abundance"][i_isotope]
+                this_second_moment += I * (I + 1) * (this_gyromag_ratio ** 2) * this_abundnance
+            this_second_moment /= (distance ** 6)
+        else:
+            this_second_moment = I * (I + 1) * (gyromag_ratio ** 2) / (distance ** 6)
 
         all_second_moment += this_second_moment
 
@@ -573,7 +580,16 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
         I = MDecoherenceAtom.nucleon_properties[symbol]['II'] / 2
         gyromag_ratio = MDecoherenceAtom.nucleon_properties[symbol]['gyromag_ratio']
 
-        unit_cell_mag_factor += I * (I + 1) * (gyromag_ratio ** 2)
+        if isinstance(MDecoherenceAtom.nucleon_properties[symbol]["abundance"], np.ndarray):
+            this_mag_factor = 0
+            for i_isotope in range(0, len(II)):
+                this_I = I[i_isotope]
+                this_gyromag_ratio = gyromag_ratio[i_isotope]
+                this_abundnance = MDecoherenceAtom.nucleon_properties[symbol]["abundance"][i_isotope]
+                this_mag_factor += this_I * (this_I + 1) * (this_gyromag_ratio ** 2) * this_abundnance
+            unit_cell_mag_factor += this_mag_factor
+        else:
+            unit_cell_mag_factor += I * (I + 1) * (gyromag_ratio ** 2)
     unit_cell_mag_factor /= unperturbed_atoms.get_number_of_atoms()
 
     integral = 4 * np.pi / (3 * max_exact_distance) * density * unit_cell_mag_factor
