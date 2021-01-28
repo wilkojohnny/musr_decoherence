@@ -197,6 +197,9 @@ nucleon_properties = {
           "Q": 0.041,
           "anti_shielding": -0.144
           },
+    "O": {"II": 0,
+          "gyromag_ratio": 0,
+          "abundance": 0},
     "F": {"II": 1,
           "gyromag_ratio": 251.713,
           "abundance": 1,
