@@ -214,7 +214,9 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                              const=const, probability=probability,
                                                                              hilbert_dim=hilbert_dim, gpu=gpu,
                                                                              shutup=shutup)
-            P_average += this_pol
+            if this_pol is not None:
+                P_average += this_pol
+
 
         else:
             # polycrystalline sample
@@ -271,8 +273,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                             P_average += this_pol * math.sin(theta) / normalisation_factor
 
         if fourier:
-            amplitude.append(this_amplitude)
             E.append(this_E)
+            amplitude.append(this_amplitude)
 
         # increment the isotope ids
         current_isotope_ids = inc_isotope_id(basis=number_isotopes, oldids=current_isotope_ids)
@@ -355,14 +357,14 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             outfile = open(outfile_location, "w")
             # do preamble
             decoherence_file_preamble(file=outfile, nn_atoms=all_spins, muon=muon, fourier=fourier,
-                                      fourier_2d=fourier_2d, tol=tol)
+                                      fourier_2d=fourier_2d, tol=tol, musr_type=musr_type)
             if fourier_2d:
                 outfile.writelines('! frequency1 frequency2 amplitude \n')
                 outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[2]) + ' ' + str(fourier_entry[0])
                                     + '\n' for fourier_entry in fourier_result])
             else:
                 outfile.writelines('! frequency amplitude \n')
-                outfile.writelines('0 ' + str(const[0, 0]) + '\n')
+                outfile.writelines('0 ' + str(1 - [sum(i) for i in zip(*fourier_result)][0]) + '\n')
                 outfile.writelines([str(fourier_entry[1]) + ' ' + str(fourier_entry[0]) + '\n' for fourier_entry
                                     in fourier_result])
             outfile.close()
