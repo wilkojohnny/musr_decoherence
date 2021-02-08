@@ -277,7 +277,7 @@ def make_supercell(atoms_mu:atoms, unperturbed_atoms: atoms = None, unperturbed_
 
 
 def get_dominant_nuclei(atoms_mu: atoms, nn_cutoff: int or None = None, hilbert_cutoff: int = 2048,
-                        unperturbed_atoms: atoms = None, unperturbed_supercell=1) -> (atoms, list):
+                        unperturbed_atoms: atoms = None, unperturbed_supercell=1) -> (atoms, atoms, list):
     """
     get the dominant nuclei in the interaction, until we hit either nn_degree or hilbert_cutoff.
     Works out dominance by mu_i/r^3 rather than by distance alone
