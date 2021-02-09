@@ -46,7 +46,8 @@ def calc_equiv_percolated_polarisation(all_spins:list, muon: atom, p: float, tim
     # add on all vacancies (i.e flat line...)
     result += p ** n_sites * np.ones(shape=times.shape)
 
-    pyplot.plot(times, result)
-    pyplot.show()
+    if plot:
+       pyplot.plot(times, result)
+       pyplot.show()
 
     return result
