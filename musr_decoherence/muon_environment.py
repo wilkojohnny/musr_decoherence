@@ -582,7 +582,7 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
 
         if isinstance(MDecoherenceAtom.nucleon_properties[symbol]["abundance"], np.ndarray):
             this_mag_factor = 0
-            for i_isotope in range(0, len(II)):
+            for i_isotope in range(0, len(I)):
                 this_I = I[i_isotope]
                 this_gyromag_ratio = gyromag_ratio[i_isotope]
                 this_abundnance = MDecoherenceAtom.nucleon_properties[symbol]["abundance"][i_isotope]
