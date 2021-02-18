@@ -248,7 +248,6 @@ nucleon_properties = {
     "V": {"II": 7,
           "gyromag_ratio": 70.322665,
           "abundance": 1},
-
     "Sc": {"II": 7,
            "gyromag_ratio": 64.9895,
            "abundance": 1,
@@ -264,8 +263,8 @@ nucleon_properties = {
            "gyromag_ratio": np.array((15.168, 15.8768, 0)) * 2 * 3.1415926536,
            "abundance": np.array((7.61, 8.58, 83.81)) * 0.01
     },
-    "Pb": {"II": 0,
-           "gyromag_ratio": 0,
-           "abundance": 1,
+    "Pb": {"II": np.array((1, 0)),
+            "gyromag_ratio": np.array((55.96496, 0)),
+            "abundance": np.array((0.226, 0.774))
     },
 }

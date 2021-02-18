@@ -466,17 +466,39 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
     mu_distances = mu_distances[:-1]
     mu_distances = sorted(mu_distances, key=lambda l: l[1])
 
-    # starting from the muon, organise the atoms by nearest-neighbours
+    mu_interactions = []
+    for i_atom, mu_distance in mu_distances:
+        # calculate the nuclear moment (or a quantity that's proportional to it...)
+        symbol = nn_atoms_mu[i_atom].symbol
+        nuclear_properties = MDecoherenceAtom.nucleon_properties[symbol]
+        hilbert_size = 1
+        if isinstance(nuclear_properties['II'], np.ndarray):
+            # calculate the average moment for all the isotopes
+            moment = 0
+            for i_isotope in range(0, len(nuclear_properties['II'])):
+                moment += abs(nuclear_properties['gyromag_ratio'][i_isotope]) * nuclear_properties['II'][i_isotope] \
+                          * nuclear_properties['abundance'][i_isotope]
+                if nuclear_properties['II'][i_isotope] + 1 > hilbert_size:
+                    hilbert_size = nuclear_properties['II'][i_isotope] + 1
+        else:
+            moment = abs(nuclear_properties['gyromag_ratio']) * nuclear_properties['II']
+            hilbert_size = nuclear_properties['II'] + 1
+        interaction_size = moment / (mu_distance ** 3)
+        mu_interactions.append([i_atom, interaction_size, hilbert_size])
+
+    mu_interactions = sorted(mu_interactions, key=lambda l: -l[1])
+
+    # starting from the muon, organise the atoms by interaction size
     muon_index = len(nn_atoms_mu)-1
     assert nn_atoms_mu[muon_index].symbol == 'X'
     nn_ids = []
-    current_distance = 0
+    current_interaction = np.inf
     current_nn_ids = [muon_index]
-    for i_atom, this_distance in mu_distances:
+    for i_atom, this_interaction, _ in mu_interactions:
         # are we in a new nnn shell?
-        if abs(current_distance - this_distance) > 1e-3:
+        if this_interaction < current_interaction * (1 - 1e-5):
             nn_ids.append(current_nn_ids)
-            current_distance = this_distance
+            current_interaction = this_interaction
             current_nn_ids = []
         current_nn_ids.append(i_atom)
     nn_ids.append(current_nn_ids)
