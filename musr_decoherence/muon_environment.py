@@ -513,7 +513,7 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
         draw_in_factor = calculate_draw_in_factor(atoms_mu=atoms_mu, nn_indices=nn_indices,
                                                   unperturbed_atoms=unperturbed_atoms,
                                                   draw_in_atoms=atoms_mu_indices[nn_start:],
-                                                  max_exact_distance=max_exact_distance)
+                                                  max_exact_distance=150)
         print('draw_in_factor calculated as {:.4f} '.format(draw_in_factor))
 
     for nnnness in range(nn_start, len(nn_ids)):
@@ -548,6 +548,7 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
 
     # build a supercell
     no_supercells = int(np.ceil(max_exact_distance / min(atoms_mu.cell.lengths())))
+
     atoms_supercell = make_supercell(atoms_mu, unperturbed_atoms, unperturbed_supercell=no_supercells,
                                      small_output=True)
 
@@ -614,7 +615,7 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
             unit_cell_mag_factor += I * (I + 1) * (gyromag_ratio ** 2)
     unit_cell_mag_factor /= unperturbed_atoms.get_number_of_atoms()
 
-    integral = 4 * np.pi / (3 * max_exact_distance) * density * unit_cell_mag_factor
+    integral = 4 * np.pi / (3 * max_exact_distance ** 3) * density * unit_cell_mag_factor
     all_second_moment += integral
 
     # use this to calculate the drawing in factor

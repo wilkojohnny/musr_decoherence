@@ -34,10 +34,11 @@ def main():
     CaF2_atoms_mu = mu_env.perturb_atoms(CaF2_atoms_mu, perturbations=perturbations)
 
     # get the dominant nuclei
-    nn_nuclei, _, _ = mu_env.get_dominant_nuclei(CaF2_atoms_mu)
+    nn_nuclei, CaF2_atoms_mu, CaF2_atoms_mu_ids = mu_env.get_dominant_nuclei(CaF2_atoms_mu)
 
     # model the further nuclei with lambda_squish
-    nn_nuclei = mu_env.model_further_nuclei(nn_nuclei, draw_in_factor=lambda_squish)
+    nn_nuclei = mu_env.model_further_nuclei(nn_nuclei, nn_start=-1, atoms_mu=CaF2_atoms_mu,
+                                            nn_indices=CaF2_atoms_mu_ids, unperturbed_atoms=CaF2_atoms)
 
     muon, all_spins = mu_env.aseatoms_to_tdecoatoms(nn_nuclei)
 
