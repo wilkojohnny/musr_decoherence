@@ -496,7 +496,7 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
     current_nn_ids = [muon_index]
     for i_atom, this_interaction, _ in mu_interactions:
         # are we in a new nnn shell?
-        if this_interaction < current_interaction * (1 - 1e-5):
+        if this_interaction < current_interaction:
             nn_ids.append(current_nn_ids)
             current_interaction = this_interaction
             current_nn_ids = []
