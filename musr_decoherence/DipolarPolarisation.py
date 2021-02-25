@@ -232,7 +232,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                  const=const, probability=probability,
                                                                                  hilbert_dim=hilbert_dim, gpu=gpu,
                                                                                  shutup=shutup)
-                P_average += this_pol
+                if this_pol is not None:
+                    P_average += this_pol
 
             else:
                 d_theta = math.pi / 7
