@@ -166,11 +166,12 @@ def gle_friendly_out(fit_parameters):
     # do labels
     print('!\t', end='')
     for name, _ in fit_parameters.items():
-        print(name + '\terr(' + name + ')\t', end='')
+        print(' {:12.10} {:12.10}'.format(name, 'err'), end='')
     print('')
     # print output
+    print(' \t', end='')
     for _, parameter in fit_parameters.items():
-        print('\t' + str(parameter.value) + '\t' + str(parameter.stderr), end='')
+        print(' {:<12.5g} {:<12.5g}'.format(parameter.value, parameter.stderr), end='')
 
 
 def print_iteration(params, iter, residuals, *args, **kwargs):
