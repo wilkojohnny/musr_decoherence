@@ -12,7 +12,7 @@ from . import TimeDependence
 from .MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
 import time as human_time
 from .TCoord3D import TCoord3D as coord  # coordinate utilities
-import numpy.linalg as linalg  # matrix stuff
+import scipy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 import math
 no_plot = False
@@ -22,7 +22,7 @@ except ModuleNotFoundError:
     no_plot = True
 import os
 from enum import Enum
-
+from . import cython_polarisation
 
 class musr_type(Enum):
     ZF = 0
@@ -233,7 +233,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                  hilbert_dim=hilbert_dim, gpu=gpu,
                                                                                  shutup=shutup)
                 if this_pol is not None:
-                    P_average += this_pol
+                    P_average = P_average + this_pol
 
             else:
                 d_theta = math.pi / 7
@@ -433,65 +433,18 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
         del dense_hamiltonian
         Rinv = R.transpose().conj()
     else:
-        this_E, R = linalg.eigh(dense_hamiltonian)
-        Rinv = R.H
+        this_E, R = linalg.eigh(dense_hamiltonian, overwrite_a=True)
+        del dense_hamiltonian
+        Rinv = R.transpose().conj()
+        R = R.copy(order='C')
     if not shutup:
         print("Found eigenvalues:")
         print(this_E)
 
-    # Calculate constant (lab book 1 page 105)
-    thisconst = 0
-    this_amplitude = np.zeros((len(R), len(R)))
-
     if not gpu:
-        for i in range(0, len(R)):
-            Rx = Rinv[i] * muon_spin_x
-            Ry = Rinv[i] * muon_spin_y
-            Rz = Rinv[i] * muon_spin_z
-            sx = Rx * R[:, i]
-            sy = Ry * R[:, i]
-            sz = Rz * R[:, i]
-            if wx is None and wy is None and wz is None:
-                # angular average mode
-                thisconst += (pow(abs(sx), 2) + pow(abs(sy), 2) + pow(abs(sz), 2)) / 3
-            else:
-                thisconst = thisconst + pow(abs(sx)*wx, 2) + pow(abs(sy)*wy, 2) + pow(abs(sz)*wz, 2)
-                # xyq
-                thisconst = thisconst + wx * wy * (pow(abs(sx + sy), 2) - pow(abs(sx), 2) - pow(abs(sy), 2))
-                # yz
-                thisconst = thisconst + wy * wz * (pow(abs(sy + sz), 2) - pow(abs(sy), 2) - pow(abs(sz), 2))
-                # xz
-                thisconst = thisconst + wx * wz * (pow(abs(sx + sz), 2) - pow(abs(sx), 2) - pow(abs(sz), 2))
+        R_roll = np.roll(R, int(hilbert_dim / 2), 0)
 
-            if not shutup:
-                print(str(100 * i / len(R)) + '% complete...')
-            if fourier_2d:
-                jmin = 0
-            else:
-                jmin = i + 1
-            for j in range(jmin, len(R)):
-                sx = Rx * R[:, j]
-                sy = Ry * R[:, j]
-                sz = Rz * R[:, j]
-                # do angular averaging if wx, wy, wz == None
-                if wx is None or wy is None or wz is None:
-                    this_amplitude[i][j] = (pow(abs(sx), 2) + pow(abs(sy), 2) + pow(abs(sz), 2)) / (3 * hilbert_dim / 2)
-                else:
-                    # not doing angular averaging -- so need to also include the sigma_i*sigma_j terms
-                    this_amplitude[i][j] = (pow(abs(sx) * wx, 2) + pow(abs(sy) * wy, 2) + pow(abs(sz) * wz, 2)) \
-                                           / (hilbert_dim / 2)
-
-                    # xy
-                    this_amplitude[i][j] = this_amplitude[i][j] + wx*wy*(pow(abs(sx + sy), 2) - pow(abs(sx), 2)
-                                                                         - pow(abs(sy), 2)) / (hilbert_dim / 2)
-                    # yz
-                    this_amplitude[i][j] = this_amplitude[i][j] + wy*wz*(pow(abs(sy + sz), 2) - pow(abs(sy), 2)
-                                                                         - pow(abs(sz), 2)) / (hilbert_dim / 2)
-                    # xz
-                    this_amplitude[i][j] = this_amplitude[i][j] + wx * wz * (pow(abs(sx + sz), 2) - pow(abs(sx), 2)
-                                                                             - pow(abs(sz), 2)) / (hilbert_dim / 2)
-
-        const = const + thisconst / (2 * (hilbert_dim / 2))
+        this_amplitude = calc_amplitudes_cpu(R, Rinv, R_roll, (wx, wy, wz), hilbert_dim)
     else:
         R_roll = cp.roll(R, int(hilbert_dim / 2), 0)
 
@@ -502,13 +455,16 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
     if not fourier:
         P_average = np.zeros(shape=times.shape)
 
-        # calculate each time separately
         if not gpu:
-            for i_time, time in np.ndenumerate(times):
-                if not shutup:
-                    print("t=" + str(time))
-                P_average[i_time] += TimeDependence.calc_p_average_t(time, const, this_amplitude, this_E).max() \
-                                     * probability
+            # for i_time, time in np.ndenumerate(times):
+            #     if not shutup:
+            #         print("t=" + str(time))
+            #     P_average[i_time] += TimeDependence.calc_p_average_t(time, const, this_amplitude, this_E).max() \
+            #                          * probability
+
+            # calculate the differences E[i]-E[j] and put into matrix
+            Ediff = np.subtract.outer(this_E, this_E)
+            P_average = cython_polarisation.calc_oscillation(this_amplitude, Ediff, times)
         else:
             # calculate the differences E[i]-E[j] and put into matrix on the GPU
             E_diff_device = TimeDependence.calc_outer_differences_gpu(this_E)
@@ -533,7 +489,32 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
     else:
         return None, this_E, this_amplitude
 
+def calc_amplitudes_cpu(R, Rinv, R_roll, weights, size):
+    """
+    calculate the amplitudes using the CPU + Cython
+    :param R: eigenvectors of the Hamiltonian
+    :param Rinv: conj eigenvectors of the Hamiltonian
+    :param weights: weights wx, wy, wz corresponding to whether a polycrystaline average or not
+    :param size: size of the Hilbert space
+    :return 2D list where a[i][j] is the amplitude of state E[i]-E[j]
+    """
 
+    # R_x is just R_roll
+    print('Calculating amplitudes...')
+    s_x = np.dot(Rinv, R_roll)
+    s_z = np.dot(Rinv, cython_polarisation.minus_half(R))
+    s_y = np.dot(Rinv, cython_polarisation.minus_half(R_roll))
+
+    del R, R_roll, Rinv
+
+    if weights == (None, None, None):
+        amplitudes = cython_polarisation.calc_amplitudes_angavg(s_x, s_y, s_z, size)
+        print('Calculated amplitudes')
+        del s_x, s_y, s_z
+    else:
+        print('need to implement cpu non-angular averages!')
+        assert False
+    return amplitudes
 
 def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
     """

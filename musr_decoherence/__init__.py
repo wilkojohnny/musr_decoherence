@@ -6,3 +6,4 @@ from . import muon_environment
 from . import PercolationPolarisation
 from .TCoord3D import TCoord3D
 from .MDecoherenceAtom import TDecoherenceAtom
+from . import cython_polarisation

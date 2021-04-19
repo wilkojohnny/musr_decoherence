@@ -34,11 +34,11 @@ def main():
     CaF2_atoms_mu = mu_env.perturb_atoms(CaF2_atoms_mu, perturbations=perturbations)
 
     # get the dominant nuclei
-    nn_nuclei, CaF2_atoms_mu, CaF2_atoms_mu_ids = mu_env.get_dominant_nuclei(CaF2_atoms_mu)
+    nn_nuclei, CaF2_atoms_mu, CaF2_atoms_mu_ids = mu_env.get_dominant_nuclei(CaF2_atoms_mu, hilbert_cutoff=8192)
 
     # model the further nuclei with lambda_squish
-    nn_nuclei = mu_env.model_further_nuclei(nn_nuclei, nn_start=-1, atoms_mu=CaF2_atoms_mu,
-                                            nn_indices=CaF2_atoms_mu_ids, unperturbed_atoms=CaF2_atoms)
+    # nn_nuclei = mu_env.model_further_nuclei(nn_nuclei, nn_start=-1, atoms_mu=CaF2_atoms_mu,
+    #                                         nn_indices=CaF2_atoms_mu_ids, unperturbed_atoms=CaF2_atoms)
 
     muon, all_spins = mu_env.aseatoms_to_tdecoatoms(nn_nuclei)
 
@@ -49,7 +49,7 @@ def main():
 
     DipolarPolarisation.calc_dipolar_polarisation(all_spins=all_spins, muon=muon, muon_sample_polarisation=muon_sample_polarisation,
                                                   plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=True, shutup=False,
-                                                  times=np.arange(0, 20, 0.1), outfile_location=output_file_name,
+                                                  times=np.arange(0, 10, 0.1), outfile_location=output_file_name,
                                                   musr_type=DipolarPolarisation.musr_type.ZF)
     return 0
 
