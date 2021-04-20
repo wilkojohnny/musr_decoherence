@@ -8,7 +8,7 @@ import os
 
 ext_modules = [
         Extension(
-            "cython_polarisation",
+            "musr_decoherence.cython_polarisation",
             ["musr_decoherence/cython_polarisation.pyx"],
             extra_compile_args = ['-fopenmp'],
             extra_link_args = ['-fopenmp']
