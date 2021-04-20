@@ -444,7 +444,12 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
     if not gpu:
         R_roll = np.roll(R, int(hilbert_dim / 2), 0)
 
+        if not shutup:
+            print('Calculating amplitudes...')
         this_amplitude = calc_amplitudes_cpu(R, Rinv, R_roll, (wx, wy, wz), hilbert_dim)
+        del R, R_roll, Rinv
+        if not shutup:
+            print('Calculated amplitudes')
     else:
         R_roll = cp.roll(R, int(hilbert_dim / 2), 0)
 
@@ -489,6 +494,7 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
     else:
         return None, this_E, this_amplitude
 
+
 def calc_amplitudes_cpu(R, Rinv, R_roll, weights, size):
     """
     calculate the amplitudes using the CPU + Cython
@@ -500,7 +506,6 @@ def calc_amplitudes_cpu(R, Rinv, R_roll, weights, size):
     """
 
     # R_x is just R_roll
-    print('Calculating amplitudes...')
     s_x = np.dot(Rinv, R_roll)
     s_z = np.dot(Rinv, cython_polarisation.minus_half(R))
     s_y = np.dot(Rinv, cython_polarisation.minus_half(R_roll))
@@ -509,7 +514,6 @@ def calc_amplitudes_cpu(R, Rinv, R_roll, weights, size):
 
     if weights == (None, None, None):
         amplitudes = cython_polarisation.calc_amplitudes_angavg(s_x, s_y, s_z, size)
-        print('Calculated amplitudes')
         del s_x, s_y, s_z
     else:
         print('need to implement cpu non-angular averages!')

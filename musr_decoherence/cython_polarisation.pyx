@@ -17,6 +17,13 @@ def minus_half(double complex [:, :] R):
 
     return R
 
+cdef extern from "<complex.h>" nogil:
+    double creal(double complex z)
+    double cabs( double complex z)
+
+cdef extern from "<math.h>" nogil:
+    double cos(double z)
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def calc_amplitudes_angavg(double complex [:, ::1] sx, double complex [:, ::1] sy, double complex [:, ::1] sz,
@@ -26,23 +33,21 @@ def calc_amplitudes_angavg(double complex [:, ::1] sx, double complex [:, ::1] s
     """
     cdef Py_ssize_t dim = sx.shape[0]
 
-    result = np.zeros((dim, dim), dtype=np.complex128)
-    cdef double complex[:,:] result_view = result
+    result = np.zeros((dim, dim), dtype=np.float64)
+    cdef double [:,:] result_view = result
 
     cdef Py_ssize_t i, j
 
     for i in prange(dim, nogil=True):
         for j in range(dim):
-            result_view[i, j] = (abs(sx[i, j]) * abs(sx[i, j]) + abs(sy[i, j]) * abs(sy[i, j])
-                                 + abs(sz[i, j]) * abs(sz[i, j])  ) / (3 * size / 2)
+            result_view[i, j] = creal(cabs(sx[i, j]) * cabs(sx[i, j]) + cabs(sy[i, j]) * cabs(sy[i, j])
+                                 + cabs(sz[i, j]) * cabs(sz[i, j])  ) / (3 * size / 2)
     return result
 
-cdef extern from "<complex.h>" nogil:
-    double complex cos(double complex z)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_oscillation(double complex [:, ::1] amplitudes, double [:, ::1] Ediff, double [:] t):
+def calc_oscillation(double [:, ::1] amplitudes, double [:, ::1] Ediff, double [:] t):
     """
     calculate the oscillatory terms, using a matrix of amplitudes and Ediff[i,j]=E[i]-E[j]
     """
@@ -50,8 +55,8 @@ def calc_oscillation(double complex [:, ::1] amplitudes, double [:, ::1] Ediff, 
     cdef Py_ssize_t n_times = t.shape[0]
     cdef Py_ssize_t amp_dim = amplitudes.shape[0]
 
-    P = np.zeros((n_times), dtype=np.complex128)
-    cdef double complex[:] P_view = P
+    P = np.zeros((n_times), dtype=np.float64)
+    cdef double [:] P_view = P
 
     # i does matrix rows, j matrix columns, k time
     cdef Py_ssize_t i, j, k
