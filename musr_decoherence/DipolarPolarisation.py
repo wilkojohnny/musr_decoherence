@@ -469,7 +469,8 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
 
             # calculate the differences E[i]-E[j] and put into matrix
             Ediff = np.subtract.outer(this_E, this_E)
-            P_average = cython_polarisation.calc_oscillation(this_amplitude, Ediff, times)
+            P_average = cython_polarisation.calc_oscillation(this_amplitude, Ediff, times) * probability
+            del this_E, Ediff, this_amplitude
         else:
             # calculate the differences E[i]-E[j] and put into matrix on the GPU
             E_diff_device = TimeDependence.calc_outer_differences_gpu(this_E)

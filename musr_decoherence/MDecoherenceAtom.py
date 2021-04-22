@@ -57,10 +57,15 @@ class TDecoherenceAtom:
         if hasattr(abundance, '__iter__'):
             # if there's more than one isotope, register them as a list
             for i in range(0, len(abundance)):
-                self.isotopes.append(TDecoherenceAtom(position=self.position, gyromag_ratio=self.gyromag_ratio[i],
-                                                      II=self.II[i], name=self.name, abundance=self.abundance[i],
-                                                      anti_shielding=self.anti_shielding, efg=self.efg,
-                                                      Q=self.Q[i]))
+                if self.II[i] > 1:
+                    self.isotopes.append(TDecoherenceAtom(position=self.position, gyromag_ratio=self.gyromag_ratio[i],
+                                                          II=self.II[i], name=self.name, abundance=self.abundance[i],
+                                                          anti_shielding=self.anti_shielding, efg=self.efg,
+                                                          Q=self.Q[i], charge=charge))
+                else:
+                    self.isotopes.append(TDecoherenceAtom(position=self.position, gyromag_ratio=self.gyromag_ratio[i],
+                                                          II=self.II[i], name=self.name, abundance=self.abundance[i],
+                                                          charge=charge))
             # don't define any of the pauli matrices
             self.pauli_x = None
             self.pauli_y = None
@@ -259,6 +264,12 @@ nucleon_properties = {
           "gyromag_ratio": -13.1067,
           "abundance": 1
     },
+    "Cd": {"II": np.array((1, 0)),
+           "gyromag_ratio": np.array((9.2361, 0)) * 2 * 3.1415926536,
+           "abundance": np.array((25.01, 74.99)) * 0.01,
+           "Q": np.array((0, 0)),
+           "charge": +2,
+           },
     "Sn": {"II": np.array((1, 1, 0)),
            "gyromag_ratio": np.array((15.168, 15.8768, 0)) * 2 * 3.1415926536,
            "abundance": np.array((7.61, 8.58, 83.81)) * 0.01
