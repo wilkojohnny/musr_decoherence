@@ -47,6 +47,41 @@ def calc_amplitudes_angavg(double complex [:, ::1] sx, double complex [:, ::1] s
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+def calc_amplitudes_initpol(double complex [:, ::1] sx, double complex [:, ::1] sy, double complex [:, ::1] sz,
+                            double wx, double wy, double wz, int size):
+    """
+    Calculate the amplitudes when NOT doing an angular average
+    """
+    cdef Py_ssize_t dim = sx.shape[0]
+
+    result = np.zeros((dim, dim), dtype=np.float64)
+    cdef double [:,:] result_view = result
+
+    cdef Py_ssize_t i, j
+
+    for i in prange(dim, nogil=True):
+        for j in range(dim):
+            result_view[i, j] = 1 / (size*1.0 / 2 ) * creal(
+                                    cabs(sx[i, j]) * cabs(sx[i, j]) * wx * wx
+                                    + cabs(sy[i, j]) * cabs(sy[i, j]) * wy * wy
+                                    + cabs(sz[i, j]) * cabs(sz[i, j]) * wz * wz
+                                    + wx * wy * (
+                                        (cabs(sx[i,j] + 1j * sy[i, j]) * cabs(sx[i,j] + 1j * sy[i, j]))
+                                        - (cabs(sx[i,j]) * cabs(sx[i,j])) - (cabs(sy[i,j]) * cabs(sy[i,j]))
+                                    ) \
+                                    + wy * wz * (
+                                            (cabs(sz[i,j] + 1j * sy[i, j]) * cabs(sz[i,j] + 1j * sy[i, j]))
+                                            - (cabs(sz[i,j]) * cabs(sz[i,j])) - (cabs(sy[i,j]) * cabs(sy[i,j]))
+                                    ) \
+                                    + wx * wz * (
+                                            (cabs(sx[i,j] + sz[i, j]) * cabs(sx[i,j] + sz[i, j]))
+                                            - (cabs(sx[i,j]) * cabs(sx[i,j])) - (cabs(sz[i,j]) * cabs(sz[i,j]))
+                                    ))
+    return result
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def calc_oscillation(double [:, ::1] amplitudes, double [:, ::1] Ediff, double [:] t):
     """
     calculate the oscillatory terms, using a matrix of amplitudes and Ediff[i,j]=E[i]-E[j]

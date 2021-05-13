@@ -264,6 +264,9 @@ nucleon_properties = {
           "gyromag_ratio": -13.1067,
           "abundance": 1
     },
+    "Ag": {"II": 1,
+           "gyromag_ratio": 1.8 * 2 * 3.1415926,
+           "abundance": 1},
     "Cd": {"II": np.array((1, 0)),
            "gyromag_ratio": np.array((9.2361, 0)) * 2 * 3.1415926536,
            "abundance": np.array((25.01, 74.99)) * 0.01,

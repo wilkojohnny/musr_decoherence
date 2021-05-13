@@ -4,17 +4,13 @@
 
 # flush printing cache (useful for ARC)
 import functools
-
 print = functools.partial(print, flush=True)
-
 import numpy as np  # for numpy arrays
-
 try:
     import matplotlib.pyplot as pyplot  # for plotting
     import matplotlib.colors as color  # for colourful plots
 except ModuleNotFoundError:
     no_plot = True
-
 from lmfit import *  # for nls curve fitting
 import re  # for regular expressions
 

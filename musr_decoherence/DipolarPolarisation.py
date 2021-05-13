@@ -517,9 +517,10 @@ def calc_amplitudes_cpu(R, Rinv, R_roll, weights, size):
         amplitudes = cython_polarisation.calc_amplitudes_angavg(s_x, s_y, s_z, size)
         del s_x, s_y, s_z
     else:
-        print('need to implement cpu non-angular averages!')
-        assert False
+        wx, wy, wz = weights
+        amplitudes = cython_polarisation.calc_amplitudes_initpol(s_x, s_y, s_z, wx, wy, wz, size)
     return amplitudes
+
 
 def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
     """
