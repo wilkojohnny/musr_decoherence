@@ -93,6 +93,17 @@ class TDecoherenceAtom:
         return TDecoherenceAtom(position=new_position, gyromag_ratio=self.gyromag_ratio, II=self.II, name=self.name,
                                 abundance=self.abundance)
 
+    def assign_efg(self, efg):
+        """
+        assign an EFG to this atom, in units of 1/angstrom^3.
+        (you should use this instead of atom.efg = [xxx], as this also sets the EFG for the isotopes
+        :param efg: efg numpy array matrix
+        """
+        self.efg = efg
+        # assign EFG to the isotopes, too
+        for isotope in self.isotopes:
+            isotope.assign_efg(efg)
+
     def __str__(self):
         return self.name + ' at ' + str(self.position) + ' (with ' + str(len(self)) + ' isotope(s))'
 

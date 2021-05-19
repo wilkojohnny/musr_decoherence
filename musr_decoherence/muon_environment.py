@@ -671,6 +671,7 @@ def aseatoms_to_tdecoatoms(atoms_mu: atoms, muon_array_id: int = -1, muon_centre
                 if i_atom in efg_ids:
                     # get the index of the efg matrix
                     efg_index = efg_ids.index(i_atom)
-                    All_spins[-1].efg = efgs[efg_index]
+                    # assign the EFG to the spin
+                    All_spins[-1].assign_efg(efgs[efg_index])
 
     return muon, All_spins
