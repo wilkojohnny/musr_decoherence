@@ -374,9 +374,14 @@ def calculate_quadrupoles(atoms_mu: atoms, dominant_indices: list, unperturbed_a
             Q = MDecoherenceAtom.nucleon_properties[atoms_mu[sc_index].symbol]['Q']
         except IndexError:
             continue
-        if Q != 0:
-            quadrupolar_nuclei.append(sc_index)
-            nn_quad_indices.append(nn_index)
+        if isinstance(Q, np.ndarray):
+            if any(isotope_Q != 0 for isotope_Q in Q):
+                quadrupolar_nuclei.append(sc_index)
+                nn_quad_indices.append(nn_index)
+        else:
+            if Q != 0:
+                quadrupolar_nuclei.append(sc_index)
+                nn_quad_indices.append(nn_index)
 
     if len(quadrupolar_nuclei) == 0:
         print('No Quadrupoles to calculate!')
