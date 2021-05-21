@@ -174,6 +174,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             for atomid in range(0, len(all_spins)):
                 Spins.append(all_spins[atomid][current_isotope_ids[atomid]])
                 probability = probability * all_spins[atomid][current_isotope_ids[atomid]].abundance
+        else:
+            Spins = all_spins
 
         hilbert_dim = 1
         for spin in Spins:
