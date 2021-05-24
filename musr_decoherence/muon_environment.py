@@ -531,7 +531,7 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
 
 
 def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atoms: atoms, draw_in_atoms: list,
-                             max_exact_distance: float = 50) -> float:
+                             max_exact_distance: float = 50, isotope_ids: dict = None) -> float:
     """
     calculate the drawing-in factor of the nuclei beyond a certain next-nearest-neighbour shell
     :param atoms_mu: ASE atoms, including muon, without the nnns extracted
@@ -541,6 +541,9 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
     :param draw_in_atoms: list of indexes to draw in (these must also be in nn_indices -- otherwise whats the point?!
     :param max_exact_distance: largest distance to calculate the second moment at -- beyond this it just does an
                                integral
+    :param isotope_ids: the IDs of the isotopes to use in the draw_in_atoms. Lets you e.g only consider one isotope
+                        for the squishing nuclei, but not for the unsquished second moment ones. Should be a dict in the
+                        format {'symbol': ID in MDecoherenceAtom.nucleon_properties}
     :return: the drawing-in factor to take into account the rest of the nuclei.
     """
 
@@ -586,10 +589,19 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
         # sort out the isotopes
         if isinstance(MDecoherenceAtom.nucleon_properties[symbol]["abundance"], np.ndarray):
             this_second_moment = 0
-            for i_isotope in range(0, len(II)):
+            if symbol in isotope_ids and id in draw_in_atoms:
+                # we should only consider the isotope requested, if its in draw_in_atoms
+                range_isotopes = range(isotope_ids[symbol], isotope_ids[symbol]+1)
+            else:
+                # otherwise consider them all
+                range_isotopes = range(0, len(II))
+            for i_isotope in range_isotopes:
                 I = II[i_isotope] / 2
                 this_gyromag_ratio = gyromag_ratio[i_isotope]
-                this_abundnance = MDecoherenceAtom.nucleon_properties[symbol]["abundance"][i_isotope]
+                if len(range_isotopes) > 1:
+                    this_abundnance = MDecoherenceAtom.nucleon_properties[symbol]["abundance"][i_isotope]
+                else:
+                    this_abundnance = 1
                 this_second_moment += I * (I + 1) * (this_gyromag_ratio ** 2) * this_abundnance
             this_second_moment /= (distance ** 6)
         else:
@@ -597,7 +609,7 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
 
         all_second_moment += this_second_moment
 
-        if id in nn_indices:
+        if id in draw_in_atoms:
             squish_second_moment += this_second_moment
 
     # add on the integral to get the total second moment
