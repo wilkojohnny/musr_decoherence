@@ -7,9 +7,11 @@ import scipy.sparse as spmat  # for sparse matrices
 import numpy as np  # for sqrt
 from . import TCoord3D  # for position
 from ase import atom, atoms  # to convert these to ASE atoms
-from ase.gui.gui import GUI  # for the ASE gui
-from ase.gui.images import Images  # to make the atoms GUI-able
-
+try:
+    from ase.gui.gui import GUI  # for the ASE gui
+    from ase.gui.images import Images  # to make the atoms GUI-able
+except ModuleNotFoundError:
+    pass
 
 class TDecoherenceAtom:
 

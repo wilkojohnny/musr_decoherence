@@ -12,8 +12,11 @@ import copy
 import numpy as np
 from ase import Atoms, atom, io
 from ase import build
-from ase.gui.gui import GUI
-from ase.gui.images import Images
+try:
+    from ase.gui.gui import GUI
+    from ase.gui.images import Images
+except ModuleNotFoundError:
+    print('Problem loading the GUI utilities.')
 
 from .MDecoherenceAtom import TDecoherenceAtom as Matom  # import class for decoherence atom
 from .TCoord3D import TCoord3D as coord
