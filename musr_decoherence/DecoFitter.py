@@ -366,13 +366,16 @@ def load_muon_data(muon_data: dict, start_time=None, end_time=None, encoding='is
                 if this_x < start_time:
                     continue
                 this_y = float(split_line[1])
-                this_yerror = float(split_line[2])
+                # if there are three entries in the line, do the error
+                if len(split_line) == 3:
+                    this_yerror = float(split_line[2])
                 if end_time is not None:
                     if this_x > end_time:
                         break
                 x.append(this_x)
                 y.append(this_y)
-                y_error.append(this_yerror)
+                if len(split_line) == 3:
+                    y_error.append(this_yerror)
         data_file.close()
         return np.array(x), np.array(y), np.array(y_error)
     else:
