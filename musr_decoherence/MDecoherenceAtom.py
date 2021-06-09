@@ -271,7 +271,7 @@ nucleon_properties = {
            "abundance": 1,
            "Q": -0.22,
            "charge": +3,
-           "anti_shielding": +11.2  # from PRA *8* 1169 (1973)
+           "anti_shielding": 9.461, # from Lucken's 1969 book #+11.2  # from PRA *8* 1169 (1973)
     },
     "Y": {"II": 1,
           "gyromag_ratio": -13.1067,
