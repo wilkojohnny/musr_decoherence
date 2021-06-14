@@ -531,7 +531,8 @@ def model_further_nuclei(nn_atoms_mu: atoms, nn_start: int = -1, draw_in_factor:
 
 
 def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atoms: atoms, draw_in_atoms: list,
-                             max_exact_distance: float = 50, isotope_ids: dict = None) -> float:
+                             max_exact_distance: float = 50, isotope_ids: dict = None,
+                             dismantled_out=False) -> any:
     """
     calculate the drawing-in factor of the nuclei beyond a certain next-nearest-neighbour shell
     :param atoms_mu: ASE atoms, including muon, without the nnns extracted
@@ -544,7 +545,10 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
     :param isotope_ids: the IDs of the isotopes to use in the draw_in_atoms. Lets you e.g only consider one isotope
                         for the squishing nuclei, but not for the unsquished second moment ones. Should be a dict in the
                         format {'symbol': ID in MDecoherenceAtom.nucleon_properties}
-    :return: the drawing-in factor to take into account the rest of the nuclei.
+    :param dismantled_out: output a tuple of (squish_2nd_moment, all_2nd_moment, nnn_squish) so that the second moments
+                           can be adjusted again later on (useful e.g for isotopes)
+    :return: the drawing-in factor to take into account the rest of the nuclei, OR tuple as described above if
+             dismantled_out is True
     """
 
     # turn draw_in_atoms into a 1D list if it is 2D
@@ -638,7 +642,10 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
     # use this to calculate the drawing in factor
     draw_in_factor = (squish_second_moment / all_second_moment) ** (1/6)
 
-    return draw_in_factor
+    if not dismantled_out:
+        return draw_in_factor
+    else:
+        return squish_second_moment, all_second_moment, draw_in_factor
 
 
 def aseatoms_to_tdecoatoms(atoms_mu: atoms, muon_array_id: int = -1, muon_centred_coords: bool = True,
