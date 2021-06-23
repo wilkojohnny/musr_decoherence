@@ -45,6 +45,8 @@ def decoherence_file_preamble(file, nn_atoms, muon, fourier, musr_type, field = 
         version_label = subprocess.check_output(["git", "describe", "--always"], cwd=script_dir).strip()
     except subprocess.CalledProcessError:
         version_label = '(version not available)'
+    except FileNotFoundError:
+        version_label = '(version not available)'
 
     file.writelines('! Using version ' + str(version_label) + '\n!\n')
 
