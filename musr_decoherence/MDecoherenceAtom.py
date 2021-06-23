@@ -208,11 +208,11 @@ nucleon_properties = {
            "Q": np.array([-0.0008, -0.045]),
            "anti_shielding": -0.2570
            },
-    "B": {"II": 3,
-          "gyromag_ratio": 85.8289,
-          "abundance": 1,
+    "B": {"II": np.array([3, 6]),
+          "gyromag_ratio": np.array([85.8289, 28.74809]),
+          "abundance": np.array([0.8042, 0.1958]),
           "charge": +3,
-          "Q": 0.041,
+          "Q": np.array([0.041, 0.085]),
           "anti_shielding": -0.144
           },
     "O": {"II": 0,

@@ -4,7 +4,7 @@ import os
 
 # make the c compiler clang in llvm (use this, because it allows for openmp)
 # the below one is if you're on macos and are using Johnny's laptop!
-# os.environ["CC"] = "/usr/local/opt/llvm/bin/clang"
+os.environ["CC"] = "/usr/local/opt/llvm/bin/clang"
 
 ext_modules = [
         Extension(
