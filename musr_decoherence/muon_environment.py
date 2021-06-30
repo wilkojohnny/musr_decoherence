@@ -554,6 +554,10 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
     # turn draw_in_atoms into a 1D list if it is 2D
     if isinstance(draw_in_atoms[0], list):
         draw_in_atoms = [j for sub in draw_in_atoms for j in sub]
+         
+    # if no isotope_ids given, make it an empty dict
+    if isotope_ids is None:
+        isotope_ids = {}
 
     # work out which atoms to ignore (i.e the ones in nn_indices but not in draw_in_atoms)
     ignored_atoms = set(nn_indices) - set(draw_in_atoms)
