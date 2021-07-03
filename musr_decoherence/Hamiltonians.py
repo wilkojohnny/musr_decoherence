@@ -77,7 +77,7 @@ def calc_quadrupolar_hamiltonian(spins):
             v_yz = spin.efg[1, 2]
             v_xz = spin.efg[0, 2]
 
-            quadrupole_term = 434.4557 * spin.Q * (1 + spin.anti_shielding) / (spin.II * (spin.II - 1)) * \
+            quadrupole_term = 218.7278 * spin.Q * (1 + spin.anti_shielding) / (spin.II * (spin.II - 1)) * \
                               (v_xx*(i_x ** 2) + v_yy * (i_y ** 2) + v_zz * (i_z ** 2)
                                + v_xy*(i_x*i_y + i_y*i_x) + v_yz*(i_y*i_z + i_z*i_y) + v_xz*(i_x*i_z + i_z*i_x))
 
