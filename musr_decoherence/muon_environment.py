@@ -46,10 +46,13 @@ def add_muon_to_aseatoms(ase_atoms: atoms, theta: float = 180, phi: float = 0, n
     if nn_indices is not None:
         muon_position = np.zeros((3,))
         # possibility 1 (or 2)
-        if len(nn_indices) > 2 or (len(nn_indices) == 2 and (theta == 180 or theta is None)):
+        if len(nn_indices) > 2:
             # if nn_indices are given, work out the average of them to get the muon position (there can be more than 2!)
             for nn_index in nn_indices:
                 muon_position += ase_atoms[nn_index].position / len(nn_indices)
+        elif (len(nn_indices) == 2 and (theta == 180 or theta is None)):
+            muon_position = ase_atoms[nn_indices[0]].position * midpoint \
+                            + ase_atoms[nn_indices[1]].position*(1-midpoint)
         elif len(nn_indices) == 2:
             # we need to calculate the muon position with theta and phi...
 
