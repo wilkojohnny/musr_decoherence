@@ -118,16 +118,19 @@ def calc_efg(spins: list, i_spin: int) -> [float, float, float]:
     return [V_xx, V_yy, V_zz]
 
 
-def calc_zeeman_hamiltonian(spins, field: coord.TCoord3D):
+def calc_zeeman_hamiltonian(spins, field: coord):
     current_hamiltonian = 0
 
     # for each atom
     for i in range(0, len(spins)):
         # calculate the Hamiltonian
-        Sx = measure_ith_spin(spins, i, spins[i].pauli_x)
-        Sy = measure_ith_spin(spins, i, spins[i].pauli_y)
-        Sz = measure_ith_spin(spins, i, spins[i].pauli_z)
-        current_hamiltonian = current_hamiltonian - spins[i].gyromag_ratio * (field.ortho_x * Sx
-                                                                              + field.ortho_y * Sy
-                                                                              + field.ortho_z * Sz)
+        current_hamiltonian += calc_zeeman_hamiltonian_term(spins, field, i)
+
     return current_hamiltonian
+
+
+def calc_zeeman_hamiltonian_term(spins, field: coord, i):
+    Sx = measure_ith_spin(spins, i, spins[i].pauli_x)
+    Sy = measure_ith_spin(spins, i, spins[i].pauli_y)
+    Sz = measure_ith_spin(spins, i, spins[i].pauli_z)
+    return - spins[i].gyromag_ratio * (field.ortho_x * Sx + field.ortho_y * Sy + field.ortho_z * Sz)

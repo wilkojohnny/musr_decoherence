@@ -16,7 +16,7 @@ except ModuleNotFoundError:
 class TDecoherenceAtom:
 
     def __init__(self, position: TCoord3D, name: str, gyromag_ratio=None, II=None, abundance=1., charge=None, Q=None,
-                 anti_shielding=None, efg: np.ndarray = None):
+                 anti_shielding=None, efg: np.ndarray = None, field: TCoord3D = None):
 
         # if only name is defined, then get the numbers from the database
         if gyromag_ratio is None or II is None:
@@ -55,6 +55,7 @@ class TDecoherenceAtom:
         self.Q = Q
         self.anti_shielding = anti_shielding
         self.efg = efg  # EFG is [V_xx, V_yy, V_zz] in Å^-3
+        self.field = field
 
         if hasattr(abundance, '__iter__'):
             # if there's more than one isotope, register them as a list
@@ -63,11 +64,11 @@ class TDecoherenceAtom:
                     self.isotopes.append(TDecoherenceAtom(position=self.position, gyromag_ratio=self.gyromag_ratio[i],
                                                           II=self.II[i], name=self.name, abundance=self.abundance[i],
                                                           anti_shielding=self.anti_shielding, efg=self.efg,
-                                                          Q=self.Q[i], charge=charge))
+                                                          Q=self.Q[i], charge=charge, field=self.field))
                 else:
                     self.isotopes.append(TDecoherenceAtom(position=self.position, gyromag_ratio=self.gyromag_ratio[i],
                                                           II=self.II[i], name=self.name, abundance=self.abundance[i],
-                                                          charge=charge))
+                                                          charge=charge, field=self.field))
             # don't define any of the pauli matrices
             self.pauli_x = None
             self.pauli_y = None
@@ -140,8 +141,11 @@ class TDecoherenceAtom:
         outstring = []
 
         # write an introductory line
-        outstring.append(linestart + self.name + ' at position ' + str(self.position) + ' with ' + str(len(self))
-                         + ' isotope(s):' + '\n')
+        outstring.append(linestart + self.name + ' at position ' + str(self.position))
+        if self.field is not None:
+            outstring.append('with field of ' + str(self.field) + ' Gauss, and ')
+        outstring.append(' with ' + str(len(self)) + ' isotope(s):' + '\n')
+
         # for each isotope...
         if len(self) > 1:
             for i in range(0, len(self)):

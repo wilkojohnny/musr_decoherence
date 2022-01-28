@@ -2,6 +2,7 @@ import numpy as np
 cimport cython
 from cython.parallel import prange
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def minus_half(double complex [:, :] R):
@@ -23,6 +24,7 @@ cdef extern from "<complex.h>" nogil:
 
 cdef extern from "<math.h>" nogil:
     double cos(double z)
+    double fabs(double z)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -105,3 +107,31 @@ def calc_oscillation(double [:, ::1] amplitudes, double [:, ::1] Ediff, double [
                 else:
                     P_view[k] += amplitudes[i, j] * cos(Ediff[i, j] * t[k])
     return P
+
+
+def compress_fourier(list fourier_result, double tol, double del_tol =1e-7):
+    """
+    compress the fourier series
+    """
+    cdef int i = 0
+
+    while i < len(fourier_result) - 1:
+        # test for degeneracy
+        if fabs(fourier_result[i][1] - fourier_result[i + 1][1]) < tol:
+            # degenerate eigenvalue: add the amplitudes, keep frequency the same
+            fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0], fourier_result[i][1])
+            # remove the i+1th (degenerate) eigenvalue
+            del fourier_result[i + 1]
+        else:
+            i = i + 1
+
+    i = 0
+    # now remove any amplitudes which are less than del_tol (don't need loads of zeros...)
+    while i < len(fourier_result):
+        if fabs(fourier_result[i][0]) < del_tol:
+            # remove the entry
+            del fourier_result[i]
+        else:
+            i = i + 1
+
+    return fourier_result

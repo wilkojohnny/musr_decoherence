@@ -201,6 +201,12 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         if do_quadrupoles:
             hamiltonian += Hamiltonians.calc_quadrupolar_hamiltonian(Spins)
 
+        # if any of the atoms have an INTERNAL magnetic field, then add the Zeeman on for that
+        # (external dealt with later)
+        for i_spin, this_spin in enumerate(Spins):
+            if this_spin.field is not None:
+                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian_term(Spins, this_spin.field * 1e-4, i_spin)
+
         # weights -- if single crystal, use that; otherwise use 1/sqrt(3) for each
         if not polycrystalline:
             # single crystal sample
@@ -339,25 +345,26 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                     i = i + 1
         else:
             fourier_result = sorted(fourier_result, key=lambda frequency: frequency[1])
-            i = 0
-            while i < len(fourier_result) - 1:
-                # test for degeneracy (up to a tolerance for machine precision)
-                if abs((fourier_result[i][1]) - (fourier_result[i + 1][1])) < tol:
-                    # degenerate eigenvalue: add the amplitudes, keep frequency the same
-                    fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0], fourier_result[i][1])
-                    # remove the i+1th (degenerate) eigenvalue
-                    del fourier_result[i + 1]
-                else:
-                    i = i + 1
+            fourier_result = cython_polarisation.compress_fourier(fourier_result, tol, 1e-7)
+            #i = 0
+            #while i < len(fourier_result) - 1:
+            #    # test for degeneracy (up to a tolerance for machine precision)
+            #    if abs((fourier_result[i][1]) - (fourier_result[i + 1][1])) < tol:
+            #        # degenerate eigenvalue: add the amplitudes, keep frequency the same
+            #        fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0], fourier_result[i][1])
+            #        # remove the i+1th (degenerate) eigenvalue
+            #        del fourier_result[i + 1]
+            #    else:
+            #        i = i + 1
 
-            i = 0
-            # now remove any amplitudes which are less than 1e-15
-            while i < len(fourier_result) - 1:
-                if abs(fourier_result[i][0]) < 1e-7:
-                    # remove the entry
-                    del fourier_result[i]
-                else:
-                    i = i + 1
+            #i = 0
+            ## now remove any amplitudes which are less than 1e-15
+            #while i < len(fourier_result) - 1:
+            #    if abs(fourier_result[i][0]) < 1e-7:
+            #        # remove the entry
+            #        del fourier_result[i]
+            #    else:
+            #        i = i + 1
 
         # dump into file if requested
         if outfile_location is not None:
