@@ -220,10 +220,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             # now calculate the polarisation or fourier components
             this_pol, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times, weights=(wx, wy, wz),
                                                                              fourier=fourier, fourier_2d=fourier_2d,
-                                                                             muon_spin_matrices=(muon_spin_x,
-                                                                                                 muon_spin_y,
-                                                                                                 muon_spin_z),
-                                                                             const=const, probability=probability,
+                                                                             probability=probability,
                                                                              hilbert_dim=hilbert_dim, gpu=gpu,
                                                                              shutup=shutup)
             if this_pol is not None:
@@ -238,10 +235,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                  weights=(None, None, None),
                                                                                  fourier=fourier,
                                                                                  fourier_2d=fourier_2d,
-                                                                                 muon_spin_matrices=(muon_spin_x,
-                                                                                                     muon_spin_y,
-                                                                                                     muon_spin_z),
-                                                                                 const=const, probability=probability,
+                                                                                 probability=probability,
                                                                                  hilbert_dim=hilbert_dim, gpu=gpu,
                                                                                  shutup=shutup)
                 if this_pol is not None:
@@ -272,10 +266,6 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                              weights=(wx, wy, wz),
                                                                                              fourier=fourier,
                                                                                              fourier_2d=fourier_2d,
-                                                                                             muon_spin_matrices= \
-                                                                                                 (muon_spin_x, muon_spin_y,
-                                                                                                  muon_spin_z),
-                                                                                             const=const,
                                                                                              probability=probability,
                                                                                              hilbert_dim=hilbert_dim,
                                                                                              gpu=gpu, shutup=True)
@@ -417,7 +407,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         return np.array(P_average)
 
 
-def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_2d, muon_spin_matrices, const, probability,
+def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_2d, probability,
                                   hilbert_dim, gpu=False, shutup=False):
     """
     calculate the polarisation from a Hamiltonian
@@ -433,7 +423,6 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
             print('Can\'t find CuPy module. Have you set up CUDA?')
             gpu = False
 
-    muon_spin_x, muon_spin_y, muon_spin_z = muon_spin_matrices
     wx, wy, wz = weights
 
     # find eigenvalues and eigenvectors of hamiltonian

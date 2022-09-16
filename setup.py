@@ -11,8 +11,9 @@ ext_modules = [
         Extension(
             "musr_decoherence.cython_polarisation",
             ["musr_decoherence/cython_polarisation.pyx"],
-            extra_compile_args = ['-fopenmp'],
-            extra_link_args = ['-fopenmp']
+            extra_compile_args = ['/openmp'],
+            extra_link_args = ['/openmp'],
+            language = 'c++'
             )
         ]
 

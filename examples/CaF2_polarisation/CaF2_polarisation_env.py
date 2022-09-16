@@ -42,14 +42,14 @@ def main():
 
     muon, all_spins = mu_env.aseatoms_to_tdecoatoms(nn_nuclei)
 
-    output_file_name = '../../../CaF2_polarisation_T20.dat'
+    output_file_name = '../../../CaF2_polarisation_1ms.dat'
 
     # define muon polarisation relative to the sample -- None for polycrystalline
     muon_sample_polarisation = None
 
     DipolarPolarisation.calc_dipolar_polarisation(all_spins=all_spins, muon=muon, muon_sample_polarisation=muon_sample_polarisation,
                                                   plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=True, shutup=False,
-                                                  times=np.arange(0, 10, 0.1), outfile_location=output_file_name,
+                                                  times=np.arange(0, 1000, 0.1), outfile_location=output_file_name,
                                                   musr_type=DipolarPolarisation.musr_type.ZF)
     return 0
 
