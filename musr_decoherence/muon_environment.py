@@ -183,7 +183,7 @@ def perturb_atoms(atoms_mu: atoms, perturbations: list, nn_supercell=3, nn_tol=1
         # do nnnness
         # make a sc*sc*sc supercell
         nn_supercell += nn_supercell % 2
-        atoms_mu_supercell = build.make_supercell(atoms_mu, np.diag([nn_supercell, nn_supercell, nn_supercell]))
+        atoms_mu_supercell = build.make_supercell(atoms_mu, np.diag([nn_supercell, nn_supercell, nn_supercell]), wrap=False)
 
         # get the most central muon
         muons = np.array([this_atom.position for this_atom in atoms_mu_supercell if this_atom.symbol == 'X'])
@@ -238,7 +238,7 @@ def make_supercell(atoms_mu:atoms, unperturbed_atoms: atoms = None, unperturbed_
     # if atoms_mu is already a supercell, then make unperturbed_atoms a supercell of the same size
     unperturbed_atoms = build.make_supercell(unperturbed_atoms, np.diag([1, 1, 1]) *
                                              atoms_mu.cell.lengths()[0] /
-                                             unperturbed_atoms.cell.lengths()[0])
+                                             unperturbed_atoms.cell.lengths()[0], wrap=False)
     muon = copy.deepcopy(atoms_mu[-1])
 
     output_list = []

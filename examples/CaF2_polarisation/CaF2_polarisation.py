@@ -47,7 +47,7 @@ def main():
 
     DipolarPolarisation.calc_dipolar_polarisation(all_spins=All_spins, muon=muon, muon_sample_polarisation=muon_sample_polarisation,
                                                   plot=True, fourier=False, fourier_2d=False, tol=1e-3, gpu=True, shutup=False,
-                                                  times=np.arange(0, 20, 0.1), outfile_location=output_file_name,
+                                                  times=np.arange(0, 20, 0.02), outfile_location=output_file_name,
                                                   musr_type=DipolarPolarisation.musr_type.ZF)
     return 0
 
