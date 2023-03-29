@@ -51,7 +51,7 @@ def calc_diffusion_polarisation(all_spins_init: list, all_spins_final: list, tim
     R_final = R_final.copy(order='C')
 
     # calculate the polarisation function for the initial state
-    wx, wy, wz = 1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)
+    wx, wy, wz = None, None, None
 
     polarisation_normal = DipolarPolarisation.calc_hamiltonian_polarisation(hamiltonian=initial_hamiltonian,
                                                                             times=times,
@@ -66,9 +66,9 @@ def calc_diffusion_polarisation(all_spins_init: list, all_spins_final: list, tim
     polarisation = polarisation_normal * np.exp(-nu * times)
 
     # do some general operations now...
-    mu_spin_x = Hamiltonians.measure_ith_spin(all_spins_init, 0, all_spins_init[0].pauli_x).todense()
-    mu_spin_y = Hamiltonians.measure_ith_spin(all_spins_init, 0, all_spins_init[0].pauli_y).todense()
-    mu_spin_z = Hamiltonians.measure_ith_spin(all_spins_init, 0, all_spins_init[0].pauli_z).todense()
+    mu_spin_x = 2 * Hamiltonians.measure_ith_spin(all_spins_init, 0, all_spins_init[0].pauli_x).todense()
+    mu_spin_y = 2 * Hamiltonians.measure_ith_spin(all_spins_init, 0, all_spins_init[0].pauli_y).todense()
+    mu_spin_z = 2 * Hamiltonians.measure_ith_spin(all_spins_init, 0, all_spins_init[0].pauli_z).todense()
 
     B_2_x = np.dot(R_final_inv, mu_spin_x)
     B_2_y = np.dot(R_final_inv, mu_spin_y)
@@ -79,28 +79,29 @@ def calc_diffusion_polarisation(all_spins_init: list, all_spins_final: list, tim
         calculate the diffusion integral
         """
 
-        A_1 = np.dot(np.dot(R_init_inv, np.diag(np.exp(1j * E_init * t_hop))), R_init)
-        A_2 = np.dot(np.dot(R_final_inv, np.diag(np.exp(1j * E_final * (t - t_hop)))), R_final)
+        A_1 = np.dot(np.dot(R_init, np.diag(np.exp(1j * E_init * t_hop))), R_init_inv)
+        A_2 = np.dot(np.dot(R_final, np.diag(np.exp(1j * E_final * (t - t_hop)))), R_final_inv)
 
         A_1_c = A_1.conj().transpose()
 
-        this_sum_z = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot(B_2_z, A_2), A_1), mu_spin_z), A_1_c),
-                                np.diag(np.exp(-1j * E_final * (t - t_hop)))), R_final)
         this_sum_x = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot(B_2_x, A_2), A_1), mu_spin_x), A_1_c),
-                                  np.diag(np.exp(-1j * E_final * (t - t_hop)))), R_final)
+                                   R_final), np.diag(np.exp(-1j * E_final * (t - t_hop))))
         this_sum_y = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot(B_2_y, A_2), A_1), mu_spin_y), A_1_c),
-                                  np.diag(np.exp(-1j * E_final * (t - t_hop)))), R_final)
+                                   R_final), np.diag(np.exp(-1j * E_final * (t - t_hop))))
+        this_sum_z = np.dot(np.dot(np.dot(np.dot(np.dot(np.dot(B_2_z, A_2), A_1), mu_spin_z), A_1_c),
+                                   R_final), np.diag(np.exp(-1j * E_final * (t - t_hop))))
 
-        summand = (this_sum_x + this_sum_y + this_sum_z)/3
+        summand = (this_sum_x + this_sum_y + this_sum_z) / 3
 
-        return np.exp(-nu * t) * np.sum(summand, axis=None)
+        return np.exp(-nu * t_hop) * np.trace(summand)
 
     # for each time in times:
     for i_t, t in enumerate(times):
+        print('t={:.2f}'.format(t))
         # calculate the integral
         integral = scipy.integrate.quad(diffusion_integral, 0, t, args=(t, nu))
         # append this onto the polarisaton
-        polarisation[i_t] += nu / init_hilbert_dim * integral[0]
+        polarisation[i_t] += nu / (init_hilbert_dim) * integral[0]
 
     import matplotlib.pyplot as plot
     plot.plot(times, polarisation)
@@ -108,8 +109,8 @@ def calc_diffusion_polarisation(all_spins_init: list, all_spins_final: list, tim
 
     # for now, also compare to SCM dynamics...
     from . import Dynamiciser
-    scm_polarisation = Dynamiciser.dynamicise(polarisation, t=times, dt=times[1]-times[0], nu=nu)
-    plot.plot(times, scm_polarisation)
+   # scm_polarisation = Dynamiciser.dynamicise(polarisation_normal, t=times, dt=times[1]-times[0], nu=nu)
+   # plot.plot(times, scm_polarisation)
 
     plot.show()
 
