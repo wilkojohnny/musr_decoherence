@@ -4,6 +4,8 @@
 
 # flush printing cache (useful for ARC)
 import functools
+import sys
+
 print = functools.partial(print, flush=True)
 import numpy as np  # for numpy arrays
 try:
@@ -158,16 +160,18 @@ def save_fit(x, fit_function, filename, params):
             file.write(str(x[i_x]) + '\t' + str(fit_function[i_x]) + '\n')
 
 
-def gle_friendly_out(fit_parameters):
-    # do labels
-    print('!\t', end='')
-    for name, _ in fit_parameters.items():
-        print(' {:12.10} {:12.10}'.format(name, 'err'), end='')
-    print('')
+def gle_friendly_out(fit_parameters, preamble='', print_headings=True, fileout=sys.stdout):
+    if print_headings:
+        # do labels
+        print('!\t', end='', file=fileout)
+        for name, _ in fit_parameters.items():
+            print(' {:12.10} {:12.10}'.format(name, 'err'), end='', file=fileout)
     # print output
-    print(' \t', end='')
+    print('\n', end='', file=fileout)
+    print(preamble + ' \t', end='', file=fileout)
     for _, parameter in fit_parameters.items():
-        print(' {:<12.5g} {:<12.5g}'.format(parameter.value, parameter.stderr), end='')
+        print(' {:<12.5g} {:<12.5g}'.format(parameter.value, parameter.stderr), end='',
+              file=fileout)
 
 
 def print_iteration(params, iter, residuals, *args, **kwargs):
