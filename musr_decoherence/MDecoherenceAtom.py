@@ -255,6 +255,13 @@ nucleon_properties = {
            "Q": 0,
            "charge": +5, # from KPF6 -- but probably not very accurate, as its not very ionic
            "anti_shielding": 0},
+    "Cl": {"II": np.array([3, 3]),
+           "gyromag_ratio": np.array([4.1717, 3.472]),
+           "abundance": np.array([0.7553, 0.2447]),
+           "Q": np.array([0, 0]),
+           "charge": np.array([-1, -1]),
+           "anti_shielding": 0
+    },
     "K":  {"II": 3,
            "gyromag_ratio": 12.4809,
            "abundance": 1, # this is not strictly true, but go with it for now.

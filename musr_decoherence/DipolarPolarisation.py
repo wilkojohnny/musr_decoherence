@@ -3,11 +3,12 @@
 # John Wilkinson 15/11/19
 
 import functools
+
 print = functools.partial(print, flush=True)
 
 import subprocess  # gets git version
 from datetime import datetime  # allows one to print out date and time
-from . import Hamiltonians # allows one to calculate Hamiltonians
+from . import Hamiltonians  # allows one to calculate Hamiltonians
 from . import TimeDependence
 from .MDecoherenceAtom import TDecoherenceAtom as atom  # for atoms
 import time as human_time
@@ -15,6 +16,7 @@ from .TCoord3D import TCoord3D as coord  # coordinate utilities
 import scipy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 import math
+
 no_plot = False
 try:
     import matplotlib.pyplot as pyplot  # plotting
@@ -23,6 +25,7 @@ except ModuleNotFoundError:
 import os
 from enum import Enum
 from . import cython_polarisation
+
 
 class musr_type(Enum):
     ZF = 0
@@ -34,7 +37,7 @@ class musr_type(Enum):
 
 
 # do decoherence file preamble
-def decoherence_file_preamble(file, nn_atoms, muon, fourier, musr_type, field = 0, starttime=None, endtime=None,
+def decoherence_file_preamble(file, nn_atoms, muon, fourier, musr_type, field=0, starttime=None, endtime=None,
                               timestep=None, fourier_2d=None, tol=None):
     # program name, date and time completed
     file.writelines('! Decoherence Calculator Output - ' + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") + '\n!\n')
@@ -101,11 +104,14 @@ def inc_isotope_id(basis, oldids=None):
 
 
 def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisation: coord = None,
-                              times: np.ndarray = np.arange(0, 10, 0.1), musr_type : musr_type = musr_type.zero_field,
+                              times: np.ndarray = np.arange(0, 10, 0.1), musr_type: musr_type = musr_type.zero_field,
                               field=0, do_quadrupoles=False, just_muon_interactions=False,
                               # other arguments
-                              fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None, tol: float = 1e-10,
-                              plot: bool = False, shutup: bool = False, gpu: bool = False):
+                              fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None,
+                              tol: float = 1e-10,
+                              plot: bool = False, shutup: bool = False, gpu: bool = False,
+                              include_first_order_dynamics=False,
+                              ):
     '''
     :param all_spins: array of the spins
     :param muon:
@@ -185,9 +191,9 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
 
         if not gpu:
             # create measurement operators for the muon's spin
-            muon_spin_x = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
-            muon_spin_y = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
-            muon_spin_z = 2*Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
+            muon_spin_x = 2 * Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_x)
+            muon_spin_y = 2 * Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_y)
+            muon_spin_z = 2 * Hamiltonians.measure_ith_spin(Spins, 0, Spins[0].pauli_z)
         else:
             # we don't use the pauli_mu to calculate this when we use GPUs...
             muon_spin_x, muon_spin_y, muon_spin_z = None, None, None
@@ -215,17 +221,18 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, coord(wx, wy, wz) * field_tesla)
             elif musr_type == musr_type.TF:
                 field_direction = coord(wx, wy, wz).get_perpendicular_vector(normalise=True)
-                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, field_direction*field_tesla)
+                hamiltonian += Hamiltonians.calc_zeeman_hamiltonian(Spins, field_direction * field_tesla)
 
             # now calculate the polarisation or fourier components
-            this_pol, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times, weights=(wx, wy, wz),
-                                                                             fourier=fourier, fourier_2d=fourier_2d,
-                                                                             muon_spin_matrices=(muon_spin_x,
-                                                                                                 muon_spin_y,
-                                                                                                 muon_spin_z),
-                                                                             const=const, probability=probability,
-                                                                             hilbert_dim=hilbert_dim, gpu=gpu,
-                                                                             shutup=shutup)
+            this_pol, this_E, _, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
+                                                                                weights=(wx, wy, wz),
+                                                                                fourier=fourier, fourier_2d=fourier_2d,
+                                                                                muon_spin_matrices=(muon_spin_x,
+                                                                                                    muon_spin_y,
+                                                                                                    muon_spin_z),
+                                                                                const=const, probability=probability,
+                                                                                hilbert_dim=hilbert_dim, gpu=gpu,
+                                                                                shutup=shutup)
             if this_pol is not None:
                 P_average += this_pol
 
@@ -234,16 +241,43 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
             # polycrystalline sample
             if musr_type == musr_type.zero_field:
                 # calculate the polarisation or fourier components
-                this_pol, this_E, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
-                                                                                 weights=(None, None, None),
-                                                                                 fourier=fourier,
-                                                                                 fourier_2d=fourier_2d,
-                                                                                 muon_spin_matrices=(muon_spin_x,
-                                                                                                     muon_spin_y,
-                                                                                                     muon_spin_z),
-                                                                                 const=const, probability=probability,
-                                                                                 hilbert_dim=hilbert_dim, gpu=gpu,
-                                                                                 shutup=shutup)
+                this_pol, this_E, this_R, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
+                                                                                         weights=(None, None, None),
+                                                                                         fourier=fourier,
+                                                                                         fourier_2d=fourier_2d,
+                                                                                         muon_spin_matrices=(
+                                                                                             muon_spin_x,
+                                                                                             muon_spin_y,
+                                                                                             muon_spin_z),
+                                                                                         const=const,
+                                                                                         probability=probability,
+                                                                                         hilbert_dim=hilbert_dim,
+                                                                                         gpu=gpu,
+                                                                                         shutup=shutup)
+
+                # if first order perturbation is on, calculate this
+                if include_first_order_dynamics:
+                    for i_t, t in enumerate(times):
+                        pert_z = np.real(
+                            calc_polarisation_with_field_perturbation_integrand(all_spins, this_E, this_R,
+                                                                                np.arange(0, 20, 1e-3), t,
+                                                                                np.array((0, 0, 1)))) / 3
+                        pert_x = np.real(
+                            calc_polarisation_with_field_perturbation_integrand(all_spins, this_E, this_R,
+                                                                                np.arange(0, 20, 1e-3), t,
+                                                                                np.array((1, 0, 0)))) / 3
+                        pert_y = np.real(
+                            calc_polarisation_with_field_perturbation_integrand(all_spins, this_E, this_R,
+                                                                                np.arange(0, 20, 1e-3), t,
+                                                                                np.array((0, 1, 0)))) / 3
+                        # print(np.max(pert_z))
+                        # print(np.max(pert_x))
+                        # print(np.max(pert_y))
+
+                        #this_pol[i_t] += pert_z
+                        #this_pol[i_t] += pert_y
+                        #this_pol[i_t] += pert_x
+
                 if this_pol is not None:
                     P_average = P_average + this_pol
 
@@ -252,35 +286,39 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                 d_phi = math.pi / 7
                 N_theta = math.pi / d_theta
                 N_phi = 2 * math.pi / d_phi
-                normalisation_factor = N_phi * math.sin(N_theta*d_theta/2) * \
-                                       math.sin((N_theta-1)*d_theta/2) / math.sin(d_theta/2)
+                normalisation_factor = N_phi * math.sin(N_theta * d_theta / 2) * \
+                                       math.sin((N_theta - 1) * d_theta / 2) / math.sin(d_theta / 2)
                 for theta in np.arange(d_theta, math.pi, d_theta):
-                    for phi in np.arange(0, 2*math.pi, d_phi):
+                    for phi in np.arange(0, 2 * math.pi, d_phi):
                         if not shutup:
                             print('theta: ' + '{:4f}'.format(theta) + '\t phi: ' + '{:4f}'.format(phi))
-                        wx, wy, wz = math.sin(theta)*math.cos(phi), math.sin(theta)*math.sin(phi), math.cos(theta)
+                        wx, wy, wz = math.sin(theta) * math.cos(phi), math.sin(theta) * math.sin(phi), math.cos(theta)
                         if musr_type == musr_type.LF:
                             field_direction = coord(wx, wy, wz)
                         elif musr_type == musr_type.TF:
-                            field_direction = coord(math.cos(theta)*math.cos(phi), math.cos(theta)*math.sin(phi),
+                            field_direction = coord(math.cos(theta) * math.cos(phi), math.cos(theta) * math.sin(phi),
                                                     -math.sin(theta))
                         current_hamiltonian = hamiltonian + Hamiltonians.calc_zeeman_hamiltonian(Spins,
                                                                                                  field_direction
                                                                                                  * field_tesla)
                         # calculate the polarisation or fourier components
-                        this_pol, this_E, this_amplitude_ang = calc_hamiltonian_polarisation(current_hamiltonian, times,
-                                                                                             weights=(wx, wy, wz),
-                                                                                             fourier=fourier,
-                                                                                             fourier_2d=fourier_2d,
-                                                                                             muon_spin_matrices= \
-                                                                                                 (muon_spin_x, muon_spin_y,
-                                                                                                  muon_spin_z),
-                                                                                             const=const,
-                                                                                             probability=probability,
-                                                                                             hilbert_dim=hilbert_dim,
-                                                                                             gpu=gpu, shutup=True)
+                        this_pol, this_E, _, this_amplitude_ang = calc_hamiltonian_polarisation(current_hamiltonian,
+                                                                                                times,
+                                                                                                weights=(wx, wy, wz),
+                                                                                                fourier=fourier,
+                                                                                                fourier_2d=fourier_2d,
+                                                                                                muon_spin_matrices= \
+                                                                                                    (muon_spin_x,
+                                                                                                     muon_spin_y,
+                                                                                                     muon_spin_z),
+                                                                                                const=const,
+                                                                                                probability=probability,
+                                                                                                hilbert_dim=hilbert_dim,
+                                                                                                gpu=gpu, shutup=True)
 
                         if fourier:
+                            if this_amplitude is None:
+                                this_amplitude = np.zeros(shape=this_amplitude_ang.shape)
                             this_amplitude += this_amplitude_ang * math.sin(theta) / normalisation_factor
                         else:
                             P_average += this_pol * math.sin(theta) / normalisation_factor
@@ -346,25 +384,6 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         else:
             fourier_result = sorted(fourier_result, key=lambda frequency: frequency[1])
             fourier_result = cython_polarisation.compress_fourier(fourier_result, tol, 1e-7)
-            #i = 0
-            #while i < len(fourier_result) - 1:
-            #    # test for degeneracy (up to a tolerance for machine precision)
-            #    if abs((fourier_result[i][1]) - (fourier_result[i + 1][1])) < tol:
-            #        # degenerate eigenvalue: add the amplitudes, keep frequency the same
-            #        fourier_result[i] = (fourier_result[i][0] + fourier_result[i + 1][0], fourier_result[i][1])
-            #        # remove the i+1th (degenerate) eigenvalue
-            #        del fourier_result[i + 1]
-            #    else:
-            #        i = i + 1
-
-            #i = 0
-            ## now remove any amplitudes which are less than 1e-15
-            #while i < len(fourier_result) - 1:
-            #    if abs(fourier_result[i][0]) < 1e-7:
-            #        # remove the entry
-            #        del fourier_result[i]
-            #    else:
-            #        i = i + 1
 
         # dump into file if requested
         if outfile_location is not None:
@@ -417,13 +436,15 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         return np.array(P_average)
 
 
-def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_2d, muon_spin_matrices, const, probability,
+def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_2d, muon_spin_matrices, const,
+                                  probability,
                                   hilbert_dim, gpu=False, shutup=False):
     """
     calculate the polarisation from a Hamiltonian
     :param hamiltonian: the Hamiltonian to use
     :param times: numpy array of the times to calculate for
     :param gpu: if True, use GPU-accelleration
+    return: P_average, eigenvalues, eigenvectors, amplutides
     """
 
     if gpu:
@@ -460,7 +481,7 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
         if not shutup:
             print('Calculating amplitudes...')
         this_amplitude = calc_amplitudes_cpu(R, Rinv, R_roll, (wx, wy, wz), hilbert_dim)
-        del R, R_roll, Rinv
+        del R_roll, Rinv
         if not shutup:
             print('Calculated amplitudes')
     else:
@@ -468,7 +489,7 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
 
         this_amplitude = calc_amplitudes_gpu(R, Rinv, R_roll, (wx, wy, wz), hilbert_dim)
 
-        del R, Rinv, R_roll
+        del Rinv, R_roll
 
     if not fourier:
         P_average = np.zeros(shape=times.shape)
@@ -483,7 +504,7 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
             # calculate the differences E[i]-E[j] and put into matrix
             Ediff = np.subtract.outer(this_E, this_E)
             P_average = cython_polarisation.calc_oscillation(this_amplitude, Ediff, times) * probability
-            del this_E, Ediff, this_amplitude
+            del Ediff, this_amplitude
         else:
             # calculate the differences E[i]-E[j] and put into matrix on the GPU
             E_diff_device = TimeDependence.calc_outer_differences_gpu(this_E)
@@ -499,14 +520,12 @@ def calc_hamiltonian_polarisation(hamiltonian, times, weights, fourier, fourier_
                 P_average[i_time] += TimeDependence.calc_oscillating_term_gpu(E_diff_device, amplitude_device,
                                                                               len(this_E), time) * probability
 
-            del this_E
-
             del E_diff_device
             del amplitude_device
 
-        return P_average, None, None
+        return P_average, this_E, R, None
     else:
-        return None, this_E, this_amplitude
+        return None, this_E, R, this_amplitude
 
 
 def calc_amplitudes_cpu(R, Rinv, R_roll, weights, size):
@@ -590,28 +609,70 @@ def calc_amplitudes_gpu(R, Rinv, R_roll, weights, size):
 
     if weights[0] is None or weights[1] is None or weights[2] is None:
         # angular average
-        a = 1 / (3*size/2) * (mod_squared(cp.matmul(Rinv, R_x)) +
-                              mod_squared(cp.matmul(Rinv, R_y)) +
-                              mod_squared(cp.matmul(Rinv, R_z)))
+        a = 1 / (3 * size / 2) * (mod_squared(cp.matmul(Rinv, R_x)) +
+                                  mod_squared(cp.matmul(Rinv, R_y)) +
+                                  mod_squared(cp.matmul(Rinv, R_z)))
     else:
         # not an angular average
         wx, wy, wz = weights
-        a = 1 / (size/2) * (mod_squared(cp.matmul(Rinv, R_x)*wx) +
-                            mod_squared(cp.matmul(Rinv, R_y)*wy) +
-                            mod_squared(cp.matmul(Rinv, R_z)*wz) +
-                            # xy
-                            wx * wy * (mod_squared(cp.matmul(Rinv, R_x) + 1j*cp.matmul(Rinv, R_y))
-                                       - mod_squared(cp.matmul(Rinv, R_x)) - mod_squared(cp.matmul(Rinv, R_y))) +
-                            # yz
-                            wy * wz * (mod_squared(1j*cp.matmul(Rinv, R_y) + cp.matmul(Rinv, R_z))
-                                       - mod_squared(cp.matmul(Rinv, R_y)) - mod_squared(cp.matmul(Rinv, R_z))) +
-                            # xz
-                            wx * wz * (mod_squared(cp.matmul(Rinv, R_x) + cp.matmul(Rinv, R_z))
-                                       - mod_squared(cp.matmul(Rinv, R_x)) - mod_squared(cp.matmul(Rinv, R_z)))
-                            )
+        a = 1 / (size / 2) * (mod_squared(cp.matmul(Rinv, R_x) * wx) +
+                              mod_squared(cp.matmul(Rinv, R_y) * wy) +
+                              mod_squared(cp.matmul(Rinv, R_z) * wz) +
+                              # xy
+                              wx * wy * (mod_squared(cp.matmul(Rinv, R_x) + 1j * cp.matmul(Rinv, R_y))
+                                         - mod_squared(cp.matmul(Rinv, R_x)) - mod_squared(cp.matmul(Rinv, R_y))) +
+                              # yz
+                              wy * wz * (mod_squared(1j * cp.matmul(Rinv, R_y) + cp.matmul(Rinv, R_z))
+                                         - mod_squared(cp.matmul(Rinv, R_y)) - mod_squared(cp.matmul(Rinv, R_z))) +
+                              # xz
+                              wx * wz * (mod_squared(cp.matmul(Rinv, R_x) + cp.matmul(Rinv, R_z))
+                                         - mod_squared(cp.matmul(Rinv, R_x)) - mod_squared(cp.matmul(Rinv, R_z)))
+                              )
 
     del R, Rinv, R_x, R_y, R_z, R_roll
 
     return a
 
 
+def calc_polarisation_with_field_perturbation_integrand(spins, E, R, tau, t, direction):
+    """
+    calculate the polarisation of the muon, by calculating the integrand of the first-order perturbation.
+    :param: spins: vector of the spins, with spins[0] being the muon
+    :param: E: eigenvalues of the zeroth order Hamiltonian
+    :param: R: matrix of eigenvectors of the zeroth ordder Hamiltonian
+    :param: tau: time in perturbation land (to be integrated over)
+    :param: t: muon time
+    :param: direction: direction of the muon spin vector
+    :return: [pert_x, pert_y, pert_z], which needs to be dot producted with B and integrated to get the perturbation
+    """
+
+    current_sum = np.zeros(shape=[3, len(tau)], dtype=np.complex128)
+    Rinv = R.conj().transpose()
+    # R[:,i] is the eigenvector column; Rinv[i] is the transpose so Rinv[i].R[:,j] = delta_ij
+
+    sig_mu_x = Hamiltonians.measure_ith_spin(spins, 0, spins[0].pauli_x).todense()
+    sig_mu_y = Hamiltonians.measure_ith_spin(spins, 0, spins[0].pauli_y).todense()
+    sig_mu_z = Hamiltonians.measure_ith_spin(spins, 0, spins[0].pauli_z).todense()
+
+    sig_mu_d = direction[0] * sig_mu_x + direction[1] * sig_mu_y + direction[2] * sig_mu_z
+
+    t = t * np.ones(shape=tau.shape)
+
+    for i_alpha, alpha in enumerate(E):
+        for i_beta, beta in enumerate(E):
+            for i_gamma, gamma in enumerate(E):
+                prod = np.dot(np.dot(Rinv[i_alpha], sig_mu_d), R[:, i_beta][:, None])
+                prod *= np.dot(np.dot(Rinv[i_gamma], sig_mu_d), R[:, i_alpha][:, None])
+                prod = np.exp(1j * (alpha * t + beta * tau)) * prod[0,0]
+                prod *= np.exp(1j * gamma * (t - tau)) - np.exp(1j * beta * (tau - t))
+
+                prod *= 1j * spins[0].gyromag_ratio / 2
+
+
+                current_sum[0] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_x), R[:, i_gamma][:, None]) * prod)[0]
+                current_sum[1] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_y), R[:, i_gamma][:, None]) * prod)[0]
+                current_sum[2] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_z), R[:, i_gamma][:, None]) * prod)[0]
+
+    print(current_sum)
+
+    return current_sum

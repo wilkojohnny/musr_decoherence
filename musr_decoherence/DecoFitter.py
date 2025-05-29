@@ -5,6 +5,7 @@
 # flush printing cache (useful for ARC)
 import functools
 import sys
+from pathlib import Path
 
 print = functools.partial(print, flush=True)
 import numpy as np  # for numpy arrays
@@ -22,7 +23,9 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
         plot_xlim=(0,15), plot_ylim=(None, None)):
     """
     :param muon_data: dict with keys N_F and N_B, the location of the files containing the forward and backward counts,
-                      and alpha, OR key 'asymmetry' with the location of the file containing the full asymmetry data
+                      and alpha, OR key 'asymmetry' with the location of the file containing the full asymmetry data.
+                      Alteratively, keys 'x', 'y', and 'y_error' with numpy arrays for each. If using x y yerrror,
+                      you can also use 'i' for the dataset instance.
     :param fit_function: function to be fitted
     :param params: fit parameters
     :param plot: True == do a plot of the result
@@ -34,13 +37,31 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
     if just_plot and not plot:
         return params
 
-    # load in the data (expect it of the form x y yerr)
-    x, y, y_error = load_muon_data(muon_data, start_time=start_time, end_time=end_time)
+    global_fitting = False
+
+    if 'asymmetry' or 'N_F' in muon_data.keys():
+        # load in the data (expect it of the form x y yerr)
+        x, y, y_error = load_muon_data(muon_data, start_time=start_time, end_time=end_time)
+    else:
+        # the data isn't in files -- so take it of the form x y y_error
+        x, y, y_error = muon_data['x'], muon_data['y'], muon_data['y_error']
+        # i identifies the dataset
+        if 'i' in muon_data.keys():
+            i = muon_data['i']
+            global_fitting = True
+
+    # check the array lengths are the same
+    assert len(x) == len(y_error) == len(y)
 
     fitted_params = params
 
     if not just_plot:
-        fit_result = minimize(residual, params, args=(fit_function, x, y, y_error), iter_cb=print_iteration,
+        if global_fitting:
+            fit_args = (fit_function, x, y, y_error, i)
+        else:
+            fit_args = (fit_function, x, y, y_error)
+
+        fit_result = minimize(residual, params, args=fit_args, iter_cb=print_iteration,
                               method=algorithm, epsfcn=epsfcn)
 
         print(fit_result.message)
@@ -49,19 +70,46 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
         fitted_params = fit_result.params
 
     # calculate the fit function one last time
-    fit_func = fit_function(fitted_params, x)
+    if global_fitting:
+        fit_func = fit_function(fitted_params, x, i)
+    else:
+        fit_func = fit_function(fitted_params, x)
+
+    # if global fitting, split fit_func up by i
+    unique_i = np.unique(i)
+    x = {val: x[i==val] for i in unique_i}
+    fit_func = {val: fit_func[i==val] for i in unique_i}
 
     # save the fit function to file
     if outfile_location is not None:
-        save_fit(x, fit_func, filename=outfile_location, params=fitted_params)
+        if global_fitting:
+            filepath = Path(outfile_location)
+            for this_i in unique_i:
+                outfile_location_i = filepath.with_name(f"{filepath_stem}_{this_i}{filepath.suffix}")
+                save_fit(x, fit_func[this_i], filename=outfile_location_i, params=fitted_params)
+        else:
+            save_fit(x, fit_func, filename=outfile_location, params=fitted_params)
 
     # plot the data
     if plot:
-        pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
-        pyplot.plot(x, fit_func, color=color.cnames['black'])
-        pyplot.xlim(plot_xlim)
-        pyplot.ylim(plot_ylim)
-        pyplot.show()
+        if global_fitting:
+            y = {val: y[i==val] for i in unique_i}
+            y_error = {val: y_error[i==val] for i in unique_i}
+            for this_i in unique_i:
+                pyplot.errorbar(x[this_i], y[this_i], y_error[this_i], ecolor=color.cnames['red'], marker='.', linestyle='none')
+                pyplot.plot(x[this_i], fit_func[this_i], color=color.cnames['black'])
+                pyplot.title(str(this_i))
+                pyplot.xlim(plot_xlim)
+                pyplot.ylim(plot_ylim)
+                pyplot.show()
+        else:
+            pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
+            pyplot.plot(x, fit_func, color=color.cnames['black'])
+            pyplot.title(str(this_i))
+            pyplot.xlim(plot_xlim)
+            pyplot.ylim(plot_ylim)
+            pyplot.show()
+
 
     return fitted_params
 
@@ -181,7 +229,7 @@ def print_iteration(params, iter, residuals, *args, **kwargs):
     return False
 
 
-def residual(params, fit_function, x, y, yerr):
+def residual(params, fit_function, x, y, yerr, i=None):
     """
     Calculates the residuals of the fit function
     :param params: parameter object of the fitting parameters
@@ -189,9 +237,13 @@ def residual(params, fit_function, x, y, yerr):
     :param x: xdata
     :param y: ydata
     :param yerr: error(ydata)
+    :param i: identifier of the dataset, None if not global fitting
     :return: residual of fit_function's description of y
     """
-    y_func = fit_function(params, x)
+    if i is None:
+        y_func = fit_function(params, x)
+    else:
+        y_func = fit_function(params, x, i)
     return (y - y_func) / yerr
 
 
