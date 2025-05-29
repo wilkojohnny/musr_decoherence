@@ -39,7 +39,7 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
 
     global_fitting = False
 
-    if 'asymmetry' or 'N_F' in muon_data.keys():
+    if ('asymmetry' in muon_data.keys()) or ('N_F' in muon_data.keys()):
         # load in the data (expect it of the form x y yerr)
         x, y, y_error = load_muon_data(muon_data, start_time=start_time, end_time=end_time)
     else:
@@ -77,8 +77,8 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
 
     # if global fitting, split fit_func up by i
     unique_i = np.unique(i)
-    x = {val: x[i==val] for i in unique_i}
-    fit_func = {val: fit_func[i==val] for i in unique_i}
+    x = {val: x[i==val] for val in unique_i}
+    fit_func = {val: fit_func[i==val] for val in unique_i}
 
     # save the fit function to file
     if outfile_location is not None:
@@ -93,8 +93,8 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
     # plot the data
     if plot:
         if global_fitting:
-            y = {val: y[i==val] for i in unique_i}
-            y_error = {val: y_error[i==val] for i in unique_i}
+            y = {val: y[i==val] for val in unique_i}
+            y_error = {val: y_error[i==val] for val in unique_i}
             for this_i in unique_i:
                 pyplot.errorbar(x[this_i], y[this_i], y_error[this_i], ecolor=color.cnames['red'], marker='.', linestyle='none')
                 pyplot.plot(x[this_i], fit_func[this_i], color=color.cnames['black'])
