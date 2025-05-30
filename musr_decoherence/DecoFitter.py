@@ -69,32 +69,34 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
 
         fitted_params = fit_result.params
 
+
     # calculate the fit function one last time
     if global_fitting:
-        fit_func = fit_function(fitted_params, x, i)
+        unique_i = np.unique(i)
+        fit_func = {}
+        # if global fitting, split fit_func up by i
+        x = {val: x[i == val] for val in unique_i}
+        for this_i in unique_i:
+            fit_func[this_i] = fit_function(fitted_params, x[this_i], this_i)
+
+        y = {val: y[i == val] for val in unique_i}
+        y_error = {val: y_error[i == val] for val in unique_i}
     else:
         fit_func = fit_function(fitted_params, x)
-
-    # if global fitting, split fit_func up by i
-    unique_i = np.unique(i)
-    x = {val: x[i==val] for val in unique_i}
-    fit_func = {val: fit_func[i==val] for val in unique_i}
 
     # save the fit function to file
     if outfile_location is not None:
         if global_fitting:
             filepath = Path(outfile_location)
             for this_i in unique_i:
-                outfile_location_i = filepath.with_name(f"{filepath_stem}_{this_i}{filepath.suffix}")
-                save_fit(x, fit_func[this_i], filename=outfile_location_i, params=fitted_params)
+                outfile_location_i = filepath.with_name(f"{filepath.stem}_{this_i}{filepath.suffix}")
+                save_fit(x[this_i], fit_func[this_i], filename=outfile_location_i, params=fitted_params)
         else:
             save_fit(x, fit_func, filename=outfile_location, params=fitted_params)
 
     # plot the data
     if plot:
         if global_fitting:
-            y = {val: y[i==val] for val in unique_i}
-            y_error = {val: y_error[i==val] for val in unique_i}
             for this_i in unique_i:
                 pyplot.errorbar(x[this_i], y[this_i], y_error[this_i], ecolor=color.cnames['red'], marker='.', linestyle='none')
                 pyplot.plot(x[this_i], fit_func[this_i], color=color.cnames['black'])
@@ -199,7 +201,7 @@ def fit_dt(muon_data: dict, asymmetry_function, params: Parameters, plot: bool, 
 
 def save_fit(x, fit_function, filename, params):
     with open(filename, 'w') as file:
-        file.write('! Fitting output for MuSR data \n')
+        file.write('! Fitting output for µSR data \n')
         file.write('!\n! Fitting parameters: \n')
         for name, parameter in params.items():
             file.write('! ' + name + ': ' + str(parameter.value) + ' +/- ' + str(parameter.stderr) + '\n')
@@ -242,9 +244,23 @@ def residual(params, fit_function, x, y, yerr, i=None):
     """
     if i is None:
         y_func = fit_function(params, x)
+        return (y - y_func) / yerr
     else:
-        y_func = fit_function(params, x, i)
-    return (y - y_func) / yerr
+        unique_i = np.unique(i)
+        # split x, y and yerr based on i:
+        x = {val: x[i == val] for val in unique_i}
+        y = {val: y[i == val] for val in unique_i}
+        y_error = {val: yerr[i == val] for val in unique_i}
+
+        y_func = []
+        res = []
+        for this_i in unique_i:
+            y_func_i = fit_function(params, x[this_i], this_i)
+            if isinstance(y_func_i, list):
+                y_func_i = np.array(y_func_i)
+            res.append((y[this_i] - y_func_i)/ y_error[this_i])
+        return np.array(res)
+
 
 
 def fb_residual(params, asym_func, xx, yy, yy_errerr, run_info, alpha=1):
