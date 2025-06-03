@@ -110,7 +110,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None,
                               tol: float = 1e-10,
                               plot: bool = False, shutup: bool = False, gpu: bool = False,
-                              include_first_order_dynamics=False,
+                              include_first_order_dynamics=False, include_second_order_dynamics=False,
+                              tau_c=None, B_var=np.array((0, 0, 0))
                               ):
     '''
     :param all_spins: array of the spins
@@ -274,9 +275,15 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                         # print(np.max(pert_x))
                         # print(np.max(pert_y))
 
-                        #this_pol[i_t] += pert_z
-                        #this_pol[i_t] += pert_y
-                        #this_pol[i_t] += pert_x
+                        # this_pol[i_t] += pert_z
+                        # this_pol[i_t] += pert_y
+                        # this_pol[i_t] += pert_x
+
+                # if second order perturbation is on, calculate it
+                if include_second_order_dynamics:
+                    this_pol += calc_polarisation_with_field_perturbation_2ndorder(all_spins, this_E, this_R,
+                                                                                   B_var,
+                                                                                   tau_c, times, None)
 
                 if this_pol is not None:
                     P_average = P_average + this_pol
@@ -663,11 +670,10 @@ def calc_polarisation_with_field_perturbation_integrand(spins, E, R, tau, t, dir
             for i_gamma, gamma in enumerate(E):
                 prod = np.dot(np.dot(Rinv[i_alpha], sig_mu_d), R[:, i_beta][:, None])
                 prod *= np.dot(np.dot(Rinv[i_gamma], sig_mu_d), R[:, i_alpha][:, None])
-                prod = np.exp(1j * (alpha * t + beta * tau)) * prod[0,0]
+                prod = np.exp(1j * (alpha * t + beta * tau)) * prod[0, 0]
                 prod *= np.exp(1j * gamma * (t - tau)) - np.exp(1j * beta * (tau - t))
 
                 prod *= 1j * spins[0].gyromag_ratio / 2
-
 
                 current_sum[0] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_x), R[:, i_gamma][:, None]) * prod)[0]
                 current_sum[1] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_y), R[:, i_gamma][:, None]) * prod)[0]
@@ -676,3 +682,113 @@ def calc_polarisation_with_field_perturbation_integrand(spins, E, R, tau, t, dir
     print(current_sum)
 
     return current_sum
+
+
+def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
+                                                       E: np.ndarray,
+                                                       R: np.ndarray,
+                                                       B_var: np.ndarray,
+                                                       tau_c: np.ndarray,
+                                                       t: np.ndarray,
+                                                       direction: np.ndarray = None):
+    """
+    Calculate the second order correction to the polarisation of the F-mu-F state, taking into account
+    the 2nd order correction due to the field-field fluctuation term being non-zero
+        calculate the polarisation of the muon, by calculating the integrand of the first-order perturbation.
+    :param: spins: list of the spins, with spins[0] being the muon
+    :param: E: eigenvalues of the zeroth order Hamiltonian, in Mrad/us
+    :param: R: matrix of eigenvectors of the zeroth order Hamiltonian
+    :param: tau_c: vector of x y z correlation times, in us
+    :param: t: experiment time, in us
+    :param: direction: direction of the muon spin vector. if None, do standard angular averaging
+    :return: perturbation of the spin-spin correlation on the muon's spin
+    """
+
+    # calculate the inverse of R too
+    Rinv = R.conj().transpose()
+
+    n_eigs = len(E)
+
+    sig_mu_x = Hamiltonians.measure_ith_spin(spins, 0, spins[0].pauli_x).todense()
+    sig_mu_y = Hamiltonians.measure_ith_spin(spins, 0, spins[0].pauli_y).todense()
+    sig_mu_z = Hamiltonians.measure_ith_spin(spins, 0, spins[0].pauli_z).todense()
+
+    sig_mu = [sig_mu_x, sig_mu_y, sig_mu_z]
+
+    # first of all, calculate the c_abg^ss' terms, using a lookup table
+    C_terms_lookup = np.full(shape=[n_eigs, n_eigs, n_eigs, 3, 3], fill_value=None)
+
+    def C_abg(alpha: int, beta: int, gamma: int, sigma: int, sigma_prime: int):
+        """
+        Calculate the C_{alpha, beta, gamma}^{sigma, sigma_prime} terms which effectively
+        become the 'selection rules' of the interaction. All parameters are integers.
+        """
+        if not (C_terms_lookup[alpha, beta, gamma, sigma, sigma_prime] is None):
+            # give lookup value
+            return C_terms_lookup[alpha, beta, gamma, sigma, sigma_prime]
+
+        # not got the lookup value yet, so calculate it...
+        # R[:,i] is the eigenvector column (ket); Rinv[i] is the transpose (bra) so Rinv[i].R[:,j] = delta_ij
+        delta_bra = Rinv[gamma]
+        alpha_braket = np.dot(R[:, alpha], R[alpha])
+        beta_ket = Rinv[beta]
+
+        this_C = np.dot(np.dot(np.dot(np.dot(delta_bra, sig_mu[sigma]),
+                                      alpha_braket), sig_mu[sigma_prime]), beta_ket)
+
+        # store in the lookup table
+        C_terms_lookup[alpha, beta, gamma, sigma, sigma_prime] = this_C
+
+        # also do the conjugate
+        C_terms_lookup[alpha, gamma, beta, sigma_prime, sigma] = this_C.conj()
+
+        return this_C
+
+    sigma_sum = np.zeros(shape=t.shape)
+    for sigma in range(0, 3):
+        sigma_prime_sum = np.zeros(shape=t.shape)
+        for sigma_prime in range(0, 3):
+            for alpha in range(0, n_eigs):
+                for beta in range(0, n_eigs):
+                    for gamma in range(0, n_eigs):
+                        c0 = C_abg(alpha, beta, gamma, sigma, sigma_prime)
+                        if c0 == 0:
+                            continue
+                        c0_coeff = (c0 * (1 / tau_c + 1j * (E[alpha] - E[beta])) /
+                                    ((E[alpha] - E[beta]) ** 2 + tau_c ** -2))
+                        for delta in range(0, n_eigs):
+                            # check that one of the c terms are not zero
+                            c1 = C_abg(gamma, delta, beta, sigma, sigma_prime)
+                            c2 = C_abg(gamma, delta, beta, sigma_prime, sigma)
+                            c1_term = np.zeros(shape=t.shape, dtype=np.complex128)
+                            c2_term = np.zeros(shape=t.shape, dtype=np.complex128)
+                            if c1 == 0 and c2 == 0:
+                                continue
+                            if c1 != 0:
+                                denom = E[gamma] - E[delta] + E[alpha] - E[beta]
+                                if denom != 0:
+                                    # calculate the two c1 terms as usual
+                                    c1_imag_coeff = -1j * np.exp(1j * t * (E[beta] - E[gamma])) \
+                                                    * (np.exp(1j * t * denom) - 1) / denom
+                                    c1_re_coeff = ((1 / tau_c + 1j * (E[gamma] - E[delta])) /
+                                                   (tau_c ** -2 + (E[gamma] - E[delta]) ** 2)) \
+                                                  * np.exp(1j * t * (E[beta] - E[delta])) * \
+                                                  (np.exp(1j * t * (E[gamma] - E[delta])) * np.exp(-t / tau_c) - 1)
+                                    c1_term = c1 * (c1_re_coeff + c1_imag_coeff)
+                            if c2 != 0:
+                                denom = E[alpha] - E[gamma]
+                                if denom != 0:
+                                    # calculate the two c1 terms as usual
+                                    c2_imag_coeff = 1j * np.exp(1j * t * (E[gamma] - E[delta])) \
+                                                    * (np.exp(1j * t * denom) - 1) / denom
+                                    c2_re_coeff = - ((1 / tau_c + 1j * (E[beta] - E[gamma])) /
+                                                     (tau_c ** -2 + (E[beta] - E[gamma]) ** 2)) \
+                                                  * np.exp(1j * t * (E[gamma] - E[delta])) * \
+                                                  (np.exp(1j * t * (E[beta] - E[gamma])) * np.exp(-t / tau_c) - 1)
+                                    c2_term = c2 * (c2_re_coeff + c2_imag_coeff)
+                            sigma_prime_sum += np.real(c0_coeff * (c1_term + c2_term))
+            sigma_prime_sum *= B_var[sigma_prime]
+        # TODO: make this adjust for the direction of the initial muon spin (just does polycrystalline for now...)
+        sigma_sum += 2 / 3 * sigma_prime_sum
+
+    return sigma_sum

@@ -77,11 +77,11 @@ class TDecoherenceAtom:
             # single isotope
             # Calculate the spin measurement matrices depending on I
             # pauli z
-            self.pauli_z = .5*np.array(spmat.diags([m for m in range(-II, II+2, 2)])) # the self.II+2 is due to Python using exclusive ranges
+            self.pauli_z = .5*np.array(spmat.diags_array([m for m in range(-II, II+2, 2)])) # the self.II+2 is due to Python using exclusive ranges
             # pauli +
-            self.pauli_plus = spmat.diags([np.sqrt(self.I*(self.I+1) - .5*m*(.5*m+1)) for m in range(-II, II, 2)], 1)
+            self.pauli_plus = spmat.diags_array([np.sqrt(self.I*(self.I+1) - .5*m*(.5*m+1)) for m in range(-II, II, 2)], offsets=1)
             # pauli -
-            self.pauli_minus = spmat.diags([np.sqrt(self.I * (self.I + 1) - .5 * m * (.5 * m + 1)) for m in range(-II, II, 2)], -1)
+            self.pauli_minus = spmat.diags_array([np.sqrt(self.I * (self.I + 1) - .5 * m * (.5 * m + 1)) for m in range(-II, II, 2)], offsets=-1)
 
             # calculate pauli x and y
             self.pauli_x = .5*(self.pauli_plus + self.pauli_minus)
