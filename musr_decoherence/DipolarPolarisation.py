@@ -730,12 +730,22 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
 
         # not got the lookup value yet, so calculate it...
         # R[:,i] is the eigenvector column (ket); Rinv[i] is the transpose (bra) so Rinv[i].R[:,j] = delta_ij
-        delta_bra = Rinv[gamma]
-        alpha_braket = np.dot(R[:, alpha], R[alpha])
-        beta_ket = Rinv[beta]
+        gamma_bra = Rinv[gamma]
+        alpha_ket = R[:, alpha]
 
-        this_C = np.dot(np.dot(np.dot(np.dot(delta_bra, sig_mu[sigma]),
-                                      alpha_braket), sig_mu[sigma_prime]), beta_ket)
+        # do the delta/alpha braket
+        gamma_sigma_alpha = np.dot(gamma_bra, np.dot(sig_mu[sigma], alpha_ket))
+
+        if gamma_sigma_alpha != 0:
+            if beta == gamma and sigma == sigma_prime:
+                this_C = np.abs(gamma_sigma_alpha) ** 2
+            else:
+                alpha_bra = alpha_ket.conj().transpose()
+                beta_ket = Rinv[beta]
+                alpha_sigmap_beta = np.dot(alpha_bra, np.dot(sig_mu[sigma_prime], beta_ket))
+                this_C = alpha_sigmap_beta * gamma_sigma_alpha
+        else:
+            this_C = np.complex128(0.0*1j)
 
         # store in the lookup table
         C_terms_lookup[alpha, beta, gamma, sigma, sigma_prime] = this_C
@@ -744,6 +754,15 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
         C_terms_lookup[alpha, gamma, beta, sigma_prime, sigma] = this_C.conj()
 
         return this_C
+
+    F_ab = np.zeros((len(E), len(E)), dtype=np.complex128)
+    tau_c_inv = 1/tau_c
+    E_diff = np.subtract.outer(E, E)
+    for i in range(len(E)):
+        for k in range(len(E)):
+            F_ab[i, k] = 1./(-1j*E_diff[i, k] + tau_c_inv)
+
+    e_tau_decay = np.exp(- t * tau_c_inv)
 
     sigma_sum = np.zeros(shape=t.shape)
     for sigma in range(0, 3):
@@ -755,43 +774,45 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
                         c0 = C_abg(alpha, beta, gamma, sigma, sigma_prime)
                         if c0 == 0:
                             continue
-                        c0_coeff = (c0 * (1 / tau_c + 1j * (E[alpha] - E[beta])) /
-                                    ((E[alpha] - E[beta]) ** 2 + tau_c ** -2))
+                        c0_coeff = F_ab[alpha, beta]
+
+                        # precalculate some exponentials
+                        e_bgt = np.exp(1j * t * E_diff[beta, gamma])
+
+                        # precalculate c2 term, as its independent of delta
+                        denom = E_diff[alpha, gamma]
+                        if denom != 0:
+                            # calculate the two c1 terms as usual
+                            c2_imag_coeff = 1j * (np.exp(1j * t * denom) - 1) / denom
+                        else:
+                            c2_imag_coeff = - t
+                        c2_re_coeff = - F_ab[beta, gamma] * (e_bgt * e_tau_decay - 1)
+
                         for delta in range(0, n_eigs):
                             # check that one of the c terms are not zero
                             c1 = C_abg(gamma, delta, beta, sigma, sigma_prime)
                             c2 = C_abg(gamma, delta, beta, sigma_prime, sigma)
                             c1_term = np.zeros(shape=t.shape, dtype=np.complex128)
                             c2_term = np.zeros(shape=t.shape, dtype=np.complex128)
+
+                            e_gdt = np.exp(1j * t * E_diff[gamma, delta])
+
                             if c1 == 0 and c2 == 0:
                                 continue
                             if c1 != 0:
-                                denom = E[gamma] - E[delta] + E[alpha] - E[beta]
+                                denom = E_diff[gamma, delta] + E_diff[alpha, beta]
                                 if denom != 0:
                                     # calculate the two c1 terms as usual
-                                    c1_imag_coeff = -1j * np.exp(1j * t * (E[beta] - E[gamma])) \
-                                                    * (np.exp(1j * t * denom) - 1) / denom
+                                    c1_imag_coeff = -1j * (np.exp(1j * t * denom) - 1) / denom
                                 else:
-                                    c1_imag_coeff = np.exp(1j * t * (E[beta] - E[gamma])) * t
-                                c1_re_coeff = ((1 / tau_c + 1j * (E[gamma] - E[delta])) /
-                                               (tau_c ** -2 + (E[gamma] - E[delta]) ** 2)) \
-                                              * np.exp(1j * t * (E[beta] - E[gamma])) * \
-                                              (np.exp(1j * t * (E[gamma] - E[delta])) * np.exp(-t / tau_c) - 1)
-                                c1_term = c1 * (c1_re_coeff + c1_imag_coeff)
+                                    c1_imag_coeff = t
+                                c1_re_coeff = F_ab[gamma, delta] * (e_gdt * e_tau_decay - 1)
+
+                                c1_term = c1 * e_bgt * (c1_re_coeff + c1_imag_coeff)
 
                             if c2 != 0:
-                                denom = E[alpha] - E[gamma]
-                                if denom != 0:
-                                    # calculate the two c1 terms as usual
-                                    c2_imag_coeff = 1j * np.exp(1j * t * (E[gamma] - E[delta])) \
-                                                    * (np.exp(1j * t * denom) - 1) / denom
-                                else:
-                                    c2_imag_coeff = - np.exp(1j * t * (E[gamma] - E[delta])) * t
-                                c2_re_coeff = - ((1 / tau_c + 1j * (E[beta] - E[gamma])) /
-                                                 (tau_c ** -2 + (E[beta] - E[gamma]) ** 2)) \
-                                              * np.exp(1j * t * (E[gamma] - E[delta])) * \
-                                              (np.exp(1j * t * (E[beta] - E[gamma])) * np.exp(-t / tau_c) - 1)
-                                c2_term = c2 * (c2_re_coeff + c2_imag_coeff)
+                                c2_term = c2 * e_gdt * (c2_re_coeff + c2_imag_coeff)
+
                             sigma_prime_sum += np.real(c0_coeff * (c1_term + c2_term))
             sigma_prime_sum *= B_var[sigma_prime]
         # TODO: make this adjust for the direction of the initial muon spin (just does polycrystalline for now...)
