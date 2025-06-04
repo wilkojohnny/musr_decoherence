@@ -775,7 +775,7 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
                                     c1_imag_coeff = np.exp(1j * t * (E[beta] - E[gamma])) * t
                                 c1_re_coeff = ((1 / tau_c + 1j * (E[gamma] - E[delta])) /
                                                (tau_c ** -2 + (E[gamma] - E[delta]) ** 2)) \
-                                              * np.exp(1j * t * (E[beta] - E[delta])) * \
+                                              * np.exp(1j * t * (E[beta] - E[gamma])) * \
                                               (np.exp(1j * t * (E[gamma] - E[delta])) * np.exp(-t / tau_c) - 1)
                                 c1_term = c1 * (c1_re_coeff + c1_imag_coeff)
 
