@@ -16,6 +16,7 @@ from .TCoord3D import TCoord3D as coord  # coordinate utilities
 import scipy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 import math
+from tqdm import tqdm
 
 no_plot = False
 try:
@@ -748,7 +749,7 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
     for sigma in range(0, 3):
         sigma_prime_sum = np.zeros(shape=t.shape)
         for sigma_prime in range(0, 3):
-            for alpha in range(0, n_eigs):
+            for alpha in tqdm(range(0, n_eigs)):
                 for beta in range(0, n_eigs):
                     for gamma in range(0, n_eigs):
                         c0 = C_abg(alpha, beta, gamma, sigma, sigma_prime)
@@ -770,22 +771,27 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
                                     # calculate the two c1 terms as usual
                                     c1_imag_coeff = -1j * np.exp(1j * t * (E[beta] - E[gamma])) \
                                                     * (np.exp(1j * t * denom) - 1) / denom
-                                    c1_re_coeff = ((1 / tau_c + 1j * (E[gamma] - E[delta])) /
-                                                   (tau_c ** -2 + (E[gamma] - E[delta]) ** 2)) \
-                                                  * np.exp(1j * t * (E[beta] - E[delta])) * \
-                                                  (np.exp(1j * t * (E[gamma] - E[delta])) * np.exp(-t / tau_c) - 1)
-                                    c1_term = c1 * (c1_re_coeff + c1_imag_coeff)
+                                else:
+                                    c1_imag_coeff = np.exp(1j * t * (E[beta] - E[gamma])) * t
+                                c1_re_coeff = ((1 / tau_c + 1j * (E[gamma] - E[delta])) /
+                                               (tau_c ** -2 + (E[gamma] - E[delta]) ** 2)) \
+                                              * np.exp(1j * t * (E[beta] - E[delta])) * \
+                                              (np.exp(1j * t * (E[gamma] - E[delta])) * np.exp(-t / tau_c) - 1)
+                                c1_term = c1 * (c1_re_coeff + c1_imag_coeff)
+
                             if c2 != 0:
                                 denom = E[alpha] - E[gamma]
                                 if denom != 0:
                                     # calculate the two c1 terms as usual
                                     c2_imag_coeff = 1j * np.exp(1j * t * (E[gamma] - E[delta])) \
                                                     * (np.exp(1j * t * denom) - 1) / denom
-                                    c2_re_coeff = - ((1 / tau_c + 1j * (E[beta] - E[gamma])) /
-                                                     (tau_c ** -2 + (E[beta] - E[gamma]) ** 2)) \
-                                                  * np.exp(1j * t * (E[gamma] - E[delta])) * \
-                                                  (np.exp(1j * t * (E[beta] - E[gamma])) * np.exp(-t / tau_c) - 1)
-                                    c2_term = c2 * (c2_re_coeff + c2_imag_coeff)
+                                else:
+                                    c2_imag_coeff = - np.exp(1j * t * (E[gamma] - E[delta])) * t
+                                c2_re_coeff = - ((1 / tau_c + 1j * (E[beta] - E[gamma])) /
+                                                 (tau_c ** -2 + (E[beta] - E[gamma]) ** 2)) \
+                                              * np.exp(1j * t * (E[gamma] - E[delta])) * \
+                                              (np.exp(1j * t * (E[beta] - E[gamma])) * np.exp(-t / tau_c) - 1)
+                                c2_term = c2 * (c2_re_coeff + c2_imag_coeff)
                             sigma_prime_sum += np.real(c0_coeff * (c1_term + c2_term))
             sigma_prime_sum *= B_var[sigma_prime]
         # TODO: make this adjust for the direction of the initial muon spin (just does polycrystalline for now...)
