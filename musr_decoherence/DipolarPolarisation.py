@@ -774,7 +774,7 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
                         c0 = C_abg(alpha, beta, gamma, sigma, sigma_prime)
                         if c0 == 0:
                             continue
-                        c0_coeff = F_ab[alpha, beta]
+                        c0_coeff = c0 * F_ab[alpha, beta]
 
                         # precalculate some exponentials
                         e_bgt = np.exp(1j * t * E_diff[beta, gamma])
@@ -816,6 +816,10 @@ def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
                             sigma_prime_sum += np.real(c0_coeff * (c1_term + c2_term))
             sigma_prime_sum *= B_var[sigma_prime]
         # TODO: make this adjust for the direction of the initial muon spin (just does polycrystalline for now...)
-        sigma_sum += 2 / 3 * sigma_prime_sum
+        sigma_sum += sigma_prime_sum /3
+
+    # now multiply it by 2 (as the Pauli matrix has an extra x2 in it, but for the density matrix we want x2 this,
+    # and divide by the size of the Hilbert space/ 2 (which gives 4 for the numerator))
+    sigma_sum *= 4 / (sig_mu_x.shape[0])
 
     return sigma_sum
