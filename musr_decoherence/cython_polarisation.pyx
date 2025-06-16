@@ -317,6 +317,7 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
 
     cdef double[:] sigma_sum = np.zeros(nt, dtype=np.float64)
     cdef double[:] sigma_prime_sum = np.zeros(nt, dtype=np.float64)
+    cdef double[:] this_sigma_prime_sum = np.zeros(nt, dtype=np.float64)
 
     cdef double complex c0, c1, c2
     cdef double complex c0_coeff
@@ -338,7 +339,10 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
         for i in range(nt):
             sigma_prime_sum[i] = 0.
         for sigma_prime in range(3):
+            for i in range(nt):
+                this_sigma_prime_sum[i] = 0.
             for alpha in range(hilbert_dim):
+                print(str(alpha) + ' of ' + str(hilbert_dim) + ' complete')
                 for beta in range(hilbert_dim):
                     for gamma in range(hilbert_dim):
                         c0 = C_abg(alpha, beta, gamma, sigma, sigma_prime)
@@ -395,9 +399,10 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
                                     c2_term[i] = c2 * e_gdt[i] * (c2_re_coeff[i] + c2_im_coeff[i])
 
                             for i in range(nt):
-                                sigma_prime_sum[i] += (c0_coeff * (c1_term[i] + c2_term[i])).real
+                                this_sigma_prime_sum[i] += (c0_coeff * (c1_term[i] + c2_term[i])).real
             for i in range(nt):
-                sigma_prime_sum[i] *= B_var
+                this_sigma_prime_sum[i] *= B_var
+                sigma_prime_sum[i] += this_sigma_prime_sum[i]
         for i in range(nt):
             sigma_sum[i] += sigma_prime_sum[i] / 3.0
 

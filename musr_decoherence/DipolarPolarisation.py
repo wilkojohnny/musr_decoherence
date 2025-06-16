@@ -111,7 +111,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None,
                               tol: float = 1e-10,
                               plot: bool = False, shutup: bool = False, gpu: bool = False,
-                              include_first_order_dynamics=False, include_second_order_dynamics=False,
+                              order=None,
                               tau_c=None, B_var=np.array((0, 0, 0))
                               ):
     '''
@@ -129,9 +129,13 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     :param tol:
     :param plot:
     :param shutup:
+    :param order: which order of field perturbations to calculate (0=no perturbations, 2=2nd order perturbation)
     :param gpu: use GPU (requires cupy)
     :return:
     '''
+
+    if order is None:
+        order = [0]
 
     if not shutup:
         for atom in all_spins:
@@ -242,6 +246,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         else:
             # polycrystalline sample
             if musr_type == musr_type.zero_field:
+                total_polarisation = np.zeros(times.shape)
                 # calculate the polarisation or fourier components
                 this_pol, this_E, this_R, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
                                                                                          weights=(None, None, None),
@@ -256,9 +261,11 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                          hilbert_dim=hilbert_dim,
                                                                                          gpu=gpu,
                                                                                          shutup=shutup)
+                if 0 in order:
+                    total_polarisation += this_pol
 
                 # if first order perturbation is on, calculate this
-                if include_first_order_dynamics:
+                if 1 in order:
                     for i_t, t in enumerate(times):
                         pert_z = np.real(
                             calc_polarisation_with_field_perturbation_integrand(all_spins, this_E, this_R,
@@ -276,18 +283,18 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                         # print(np.max(pert_x))
                         # print(np.max(pert_y))
 
-                        # this_pol[i_t] += pert_z
-                        # this_pol[i_t] += pert_y
-                        # this_pol[i_t] += pert_x
+                        total_polarisation[i_t] += pert_z
+                        total_polarisation[i_t] += pert_y
+                        total_polarisation[i_t] += pert_x
 
                 # if second order perturbation is on, calculate it
-                if include_second_order_dynamics:
-                    this_pol += calc_polarisation_with_field_perturbation_2ndorder(all_spins, this_E, this_R,
-                                                                                   B_var,
-                                                                                   tau_c, times, None)
+                if 2 in order:
+                    total_polarisation += calc_polarisation_with_field_perturbation_2ndorder(all_spins, this_E, this_R,
+                                                                                             B_var,
+                                                                                             tau_c, times, None)
 
-                if this_pol is not None:
-                    P_average = P_average + this_pol
+                if total_polarisation is not None:
+                    P_average = P_average + total_polarisation
 
             else:
                 d_theta = math.pi / 7
