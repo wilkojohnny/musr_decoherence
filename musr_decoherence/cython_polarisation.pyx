@@ -339,8 +339,8 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
             for k in range(hilbert_dim):
                 E_diff[i_t, i, k] = (E[i] - E[k]) * t[i_t]
 
-    # make the exp safe (exp(-100) is a bit much!!)
-    if 0.01 / tau_c < 100.:
+    # make the exp safe (-708.4 is the magic number according to docs. <-20 should be more than enough though...)
+    if 0.01 / tau_c < 20.:
         for i in range(nt):
             e_tau_decay[i] = exp(-t[i]/tau_c)
     else:

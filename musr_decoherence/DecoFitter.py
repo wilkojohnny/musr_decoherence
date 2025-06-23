@@ -227,8 +227,20 @@ def gle_friendly_out(fit_parameters, preamble='', print_headings=True, fileout=s
 def print_iteration(params, iter, residuals, *args, **kwargs):
     # this function is run at every iteration of the fit
     print('Iteration ' + str(iter))
+    n_vary = 0
+    for param_name in params:
+        if params[param_name].vary:
+            n_vary +=1
+    chi2perdof = np.sum(residuals ** 2) / (len(residuals) - n_vary)
+    print('Chi2 per dof = {:.4f}'.format(chi2perdof))
+    if chi2perdof > 10:
+        print('😂 Might as well give up...')
+    elif chi2perdof > 5:
+        print('Nice try...')
+    elif chi2perdof > 1 and chi2perdof < 2:
+        print('😊 Looking good!!')
     print(params.pretty_print())
-    return False
+    return None
 
 
 def residual(params, fit_function, x, y, yerr, i=None):
