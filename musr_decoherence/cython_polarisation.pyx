@@ -7,6 +7,8 @@ from cython.parallel import prange
 ctypedef np.float64_t float64_t
 ctypedef np.complex128_t complex128_t
 
+cdef double C_EPS = 1.e-10
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def minus_half(double complex [:, :] R):
@@ -238,6 +240,8 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
         cdef double complex gamma_sigma_alpha = 0.j
         cdef double complex alpha_sigma_prime_beta = 0.j
 
+        cdef Py_ssize_t i
+
         # do sigma|alpha>
         if sigma == 0:
             # x
@@ -335,17 +339,21 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
             for k in range(hilbert_dim):
                 E_diff[i_t, i, k] = (E[i] - E[k]) * t[i_t]
 
-    for i in range(nt):
-        e_tau_decay[i] = exp(-t[i]/tau_c)
+    # make the exp safe (exp(-100) is a bit much!!)
+    if 0.01 / tau_c < 100.:
+        for i in range(nt):
+            e_tau_decay[i] = exp(-t[i]/tau_c)
+    else:
+        e_tau_decay[i] = 0.
 
     for sigma in range(3):
         for i in range(nt):
             sigma_prime_sum[i] = 0.
         for sigma_prime in range(3):
+            print(str(sigma*3 + sigma_prime) + ' of 9 complete')
             for i in range(nt):
                 this_sigma_prime_sum[i] = 0.
             for alpha in range(hilbert_dim):
-                print(str(alpha) + ' of ' + str(hilbert_dim) + ' complete')
                 for beta in range(hilbert_dim):
                     for delta in range(hilbert_dim):
                         c0 = C_abg(alpha, beta, delta, sigma, sigma_prime)
@@ -369,7 +377,7 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
 
                             if c1 != 0:
                                 denom = E[gamma] - E[delta] + E[alpha] - E[beta]
-                                if denom != 0:
+                                if abs(denom) > C_EPS:
                                     for i in range(nt):
                                         c1_im_coeff[i] = -1j * (cos(t[i] * denom) + 1j*sin(t[i] * denom) - 1) / denom
                                 else:
@@ -388,7 +396,7 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
                                     e_bgt[i] = cos(E_diff[i, beta, gamma]) + 1.j*sin(E_diff[i, beta, gamma])
 
                                 denom = E[alpha] - E[gamma]
-                                if denom != 0:
+                                if abs(denom) > C_EPS:
                                     for i in range(nt):
                                         c2_im_coeff[i] = 1j * (cos(E_diff[i, alpha, gamma]) +
                                                                1.j*sin(E_diff[i, alpha, gamma]) - 1) / denom
