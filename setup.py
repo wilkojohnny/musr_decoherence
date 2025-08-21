@@ -1,11 +1,15 @@
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 import os
+import numpy
 
 # make the c compiler clang in llvm (use this, because it allows for openmp)
-# the below one is if you're on macos and are using Johnny's laptop!
-# os.environ["CC"] = "/usr/local/opt/llvm/bin/clang"
-os.environ["CC"] = "gcc"
+# the below one is if you're on macos and are using Johnny's old laptop!
+#os.environ["CC"] = "/usr/local/opt/llvm/bin/clang"
+# os.environ["CC"] = "gcc"
+# this one is for the new homebrew llvm clang
+os.environ["CC"] = "/opt/homebrew/opt/llvm/bin/clang"
+
 
 ext_modules = [
         Extension(
@@ -25,6 +29,7 @@ setup(
         'gpu' : ['cupy']
     },
     ext_modules = cythonize(ext_modules),
+    include_dirs=[numpy.get_include()],
     url='',
     license='',
     author='John Wilkinson',

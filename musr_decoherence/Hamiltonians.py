@@ -40,9 +40,9 @@ def calc_hamiltonian_term(spins, i, j, sparse_format='csr'):
     j_z = measure_ith_spin(spins, j, spins[j].pauli_z, sparse_format=sparse_format)
 
     # Calculate the hamiltonian!
-    return A / pow(abs(r.r()), 3) * (i_x * j_x + i_y * j_y + i_z * j_z
+    return A / pow(abs(r.r()), 3) * (i_x @ j_x + i_y @ j_y + i_z @ j_z
                                      - 3 * (i_x * r.xhat() + i_y * r.yhat() + i_z * r.zhat())
-                                     * (j_x * r.xhat() + j_y * r.yhat() + j_z * r.zhat()))
+                                     @ (j_x * r.xhat() + j_y * r.yhat() + j_z * r.zhat()))
 
 
 def calc_dipolar_hamiltonian(spins, just_muon_interactions=False, sparse_format='csr'):
@@ -70,6 +70,10 @@ def calc_quadrupolar_hamiltonian(spins):
             i_y = measure_ith_spin(spins, spin_i, spin.pauli_y)
             i_z = measure_ith_spin(spins, spin_i, spin.pauli_z)
 
+            i_x2 = i_x @ i_x
+            i_y2 = i_y @ i_y
+            i_z2 = i_z @ i_z
+
             v_xx = spin.efg[0, 0]
             v_yy = spin.efg[1, 1]
             v_zz = spin.efg[2, 2]
@@ -78,8 +82,8 @@ def calc_quadrupolar_hamiltonian(spins):
             v_xz = spin.efg[0, 2]
 
             quadrupole_term = 218.7278 * spin.Q * (1 + spin.anti_shielding) / (spin.II * (spin.II - 1)) * \
-                              (v_xx*(i_x ** 2) + v_yy * (i_y ** 2) + v_zz * (i_z ** 2)
-                               + v_xy*(i_x*i_y + i_y*i_x) + v_yz*(i_y*i_z + i_z*i_y) + v_xz*(i_x*i_z + i_z*i_x))
+                              (v_xx*i_x2 + v_yy * i_y2 + v_zz * i_z2
+                               + v_xy*(i_x@i_y + i_y@i_x) + v_yz*(i_y@i_z + i_z@i_y) + v_xz*(i_x@i_z + i_z@i_x))
 
             current_hamiltonian = current_hamiltonian + quadrupole_term
     return current_hamiltonian

@@ -16,6 +16,7 @@ from .TCoord3D import TCoord3D as coord  # coordinate utilities
 import scipy.linalg as linalg  # matrix stuff
 import numpy as np  # for numpy arrays
 import math
+from tqdm import tqdm
 
 no_plot = False
 try:
@@ -110,7 +111,8 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                               fourier: bool = False, fourier_2d: bool = False, outfile_location: str = None,
                               tol: float = 1e-10,
                               plot: bool = False, shutup: bool = False, gpu: bool = False,
-                              include_first_order_dynamics=False,
+                              order=None,
+                              tau_c=None, B_var=np.array((0, 0, 0))
                               ):
     '''
     :param all_spins: array of the spins
@@ -127,9 +129,13 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
     :param tol:
     :param plot:
     :param shutup:
+    :param order: which order of field perturbations to calculate (0=no perturbations, 2=2nd order perturbation)
     :param gpu: use GPU (requires cupy)
     :return:
     '''
+
+    if order is None:
+        order = [0]
 
     if not shutup:
         for atom in all_spins:
@@ -240,6 +246,7 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
         else:
             # polycrystalline sample
             if musr_type == musr_type.zero_field:
+                total_polarisation = np.zeros(times.shape)
                 # calculate the polarisation or fourier components
                 this_pol, this_E, this_R, this_amplitude = calc_hamiltonian_polarisation(hamiltonian, times,
                                                                                          weights=(None, None, None),
@@ -254,9 +261,11 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                                                                                          hilbert_dim=hilbert_dim,
                                                                                          gpu=gpu,
                                                                                          shutup=shutup)
+                if 0 in order:
+                    total_polarisation += this_pol
 
                 # if first order perturbation is on, calculate this
-                if include_first_order_dynamics:
+                if 1 in order:
                     for i_t, t in enumerate(times):
                         pert_z = np.real(
                             calc_polarisation_with_field_perturbation_integrand(all_spins, this_E, this_R,
@@ -274,12 +283,18 @@ def calc_dipolar_polarisation(all_spins: list, muon: atom, muon_sample_polarisat
                         # print(np.max(pert_x))
                         # print(np.max(pert_y))
 
-                        #this_pol[i_t] += pert_z
-                        #this_pol[i_t] += pert_y
-                        #this_pol[i_t] += pert_x
+                        total_polarisation[i_t] += pert_z
+                        total_polarisation[i_t] += pert_y
+                        total_polarisation[i_t] += pert_x
 
-                if this_pol is not None:
-                    P_average = P_average + this_pol
+                # if second order perturbation is on, calculate it
+                if 2 in order:
+                    total_polarisation += calc_polarisation_with_field_perturbation_2ndorder(all_spins, this_E, this_R,
+                                                                                             B_var,
+                                                                                             tau_c, times, None)
+
+                if total_polarisation is not None:
+                    P_average = P_average + total_polarisation
 
             else:
                 d_theta = math.pi / 7
@@ -663,11 +678,10 @@ def calc_polarisation_with_field_perturbation_integrand(spins, E, R, tau, t, dir
             for i_gamma, gamma in enumerate(E):
                 prod = np.dot(np.dot(Rinv[i_alpha], sig_mu_d), R[:, i_beta][:, None])
                 prod *= np.dot(np.dot(Rinv[i_gamma], sig_mu_d), R[:, i_alpha][:, None])
-                prod = np.exp(1j * (alpha * t + beta * tau)) * prod[0,0]
+                prod = np.exp(1j * (alpha * t + beta * tau)) * prod[0, 0]
                 prod *= np.exp(1j * gamma * (t - tau)) - np.exp(1j * beta * (tau - t))
 
                 prod *= 1j * spins[0].gyromag_ratio / 2
-
 
                 current_sum[0] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_x), R[:, i_gamma][:, None]) * prod)[0]
                 current_sum[1] += np.array(np.dot(np.dot(Rinv[i_beta], sig_mu_y), R[:, i_gamma][:, None]) * prod)[0]
@@ -676,3 +690,34 @@ def calc_polarisation_with_field_perturbation_integrand(spins, E, R, tau, t, dir
     print(current_sum)
 
     return current_sum
+
+
+def calc_polarisation_with_field_perturbation_2ndorder(spins: list,
+                                                       E: np.ndarray,
+                                                       R: np.ndarray,
+                                                       B_var: np.ndarray,
+                                                       tau_c: np.ndarray,
+                                                       t: np.ndarray,
+                                                       direction: np.ndarray = None):
+    """
+    Calculate the second order correction to the polarisation of the F-mu-F state, taking into account
+    the 2nd order correction due to the field-field fluctuation term being non-zero
+        calculate the polarisation of the muon, by calculating the integrand of the first-order perturbation.
+    :param: spins: list of the spins, with spins[0] being the muon
+    :param: E: eigenvalues of the zeroth order Hamiltonian, in Mrad/us
+    :param: R: matrix of eigenvectors of the zeroth order Hamiltonian
+    :param: tau_c: vector of x y z correlation times, in us
+    :param: t: experiment time, in us
+    :param: direction: direction of the muon spin vector. if None, do standard angular averaging
+    :return: perturbation of the spin-spin correlation on the muon's spin
+    """
+
+    # calculate the inverse of R too
+    Rinv = R.conj().transpose()
+
+    R = np.ascontiguousarray(R)
+    Rinv = np.ascontiguousarray(Rinv)
+
+    sum = cython_polarisation.calculate_second_order(R, Rinv, E, B_var[0], tau_c, t)
+
+    return sum

@@ -62,7 +62,7 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
             fit_args = (fit_function, x, y, y_error)
 
         fit_result = minimize(residual, params, args=fit_args, iter_cb=print_iteration,
-                              method=algorithm, epsfcn=epsfcn)
+                              method=algorithm, epsfcn=epsfcn, nan_policy='propagate')
 
         print(fit_result.message)
         print(fit_report(fit_result))
@@ -107,7 +107,7 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
         else:
             pyplot.errorbar(x, y, y_error, ecolor=color.cnames['red'], marker='.', linestyle='none')
             pyplot.plot(x, fit_func, color=color.cnames['black'])
-            pyplot.title(str(this_i))
+            pyplot.title('Fit output')
             pyplot.xlim(plot_xlim)
             pyplot.ylim(plot_ylim)
             pyplot.show()
@@ -227,8 +227,20 @@ def gle_friendly_out(fit_parameters, preamble='', print_headings=True, fileout=s
 def print_iteration(params, iter, residuals, *args, **kwargs):
     # this function is run at every iteration of the fit
     print('Iteration ' + str(iter))
+    n_vary = 0
+    for param_name in params:
+        if params[param_name].vary:
+            n_vary +=1
+    chi2perdof = np.sum(residuals ** 2) / (len(residuals) - n_vary)
+    print('Chi2 per dof = {:.4f}'.format(chi2perdof))
+    if chi2perdof > 10:
+        print('😂 Might as well give up...')
+    elif chi2perdof > 5:
+        print('Nice try...')
+    elif chi2perdof > 1 and chi2perdof < 2:
+        print('😊 Looking good!!')
     print(params.pretty_print())
-    return False
+    return None
 
 
 def residual(params, fit_function, x, y, yerr, i=None):

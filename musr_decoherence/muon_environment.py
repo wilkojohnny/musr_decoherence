@@ -624,7 +624,7 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
             squish_second_moment += this_second_moment
 
     # add on the integral to get the total second moment
-    density = unperturbed_atoms.get_number_of_atoms() / unperturbed_atoms.get_volume()
+    density = len(unperturbed_atoms)/ unperturbed_atoms.get_volume()
     unit_cell_mag_factor = 0
     for this_atom in unperturbed_atoms:
         symbol = this_atom.symbol
@@ -641,7 +641,7 @@ def calculate_draw_in_factor(atoms_mu: atoms, nn_indices: list, unperturbed_atom
             unit_cell_mag_factor += this_mag_factor
         else:
             unit_cell_mag_factor += I * (I + 1) * (gyromag_ratio ** 2)
-    unit_cell_mag_factor /= unperturbed_atoms.get_number_of_atoms()
+    unit_cell_mag_factor /= len(unperturbed_atoms)
 
     integral = 4 * np.pi / (3 * max_exact_distance ** 3) * density * unit_cell_mag_factor
     all_second_moment += integral
