@@ -201,7 +201,7 @@ def compress_fourier(fourier_result: list, tol : double, del_tol =1e-7):
     return fourier_result
 
 def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, double[:] E,
-                           double B_var, double tau_c, double[:] t) -> complex:
+                           double B_var, double tau_c, double[:] t) -> float[:]:
     """
     Calculate the second order correction, assuming a fluctuating background field
     :param R: matrix of eigenvectors
@@ -310,7 +310,11 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
     cdef double complex[:, :] F_ab = np.zeros((hilbert_dim, hilbert_dim), dtype=np.complex128)
     for i in range(hilbert_dim):
         for k in range(hilbert_dim):
-            F_ab[i, k] = 1.0 / (-1j * (E[i] - E[k]) + tau_c_inv)
+            if 1e6*(E[i]-E[k]) < tau_c_inv:
+                # use small energy gap approximation, to try and reduce numerical errors
+                F_ab[i, k] = tau_c + 1.j * tau_c ** 2 * (E[i] - E[k])
+            else:
+                F_ab[i, k] = 1.0 / (-1.j * (E[i] - E[k]) + tau_c_inv)
 
 
     cdef Py_ssize_t sigma, sigma_prime, alpha, beta, gamma, delta, nt = t.shape[0]

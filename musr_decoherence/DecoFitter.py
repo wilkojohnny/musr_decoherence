@@ -62,7 +62,7 @@ def fit(muon_data: dict, fit_function, params: Parameters, plot: bool, start_tim
             fit_args = (fit_function, x, y, y_error)
 
         fit_result = minimize(residual, params, args=fit_args, iter_cb=print_iteration,
-                              method=algorithm, epsfcn=epsfcn)
+                              method=algorithm, epsfcn=epsfcn, nan_policy='propagate')
 
         print(fit_result.message)
         print(fit_report(fit_result))
