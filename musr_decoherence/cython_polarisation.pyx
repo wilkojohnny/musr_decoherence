@@ -306,17 +306,6 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
     cdef double tau_c_inv = 1.0 / tau_c
 
 
-    # now do F_ab
-    cdef double complex[:, :] F_ab = np.zeros((hilbert_dim, hilbert_dim), dtype=np.complex128)
-    for i in range(hilbert_dim):
-        for k in range(hilbert_dim):
-            if 1e6*(E[i]-E[k]) < tau_c_inv:
-                # use small energy gap approximation, to try and reduce numerical errors
-                F_ab[i, k] = tau_c + 1.j * tau_c ** 2 * (E[i] - E[k])
-            else:
-                F_ab[i, k] = 1.0 / (-1.j * (E[i] - E[k]) + tau_c_inv)
-
-
     cdef Py_ssize_t sigma, sigma_prime, alpha, beta, gamma, delta, nt = t.shape[0]
     cdef double[:] e_tau_decay = np.zeros(nt)
 
@@ -327,28 +316,15 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
     cdef double complex c0, c1, c2
     cdef double complex c0_coeff
     cdef double complex[:] c1_term = np.zeros(nt, dtype=np.complex128)
-    cdef double complex[:] c1_re_coeff = np.zeros(nt, dtype=np.complex128)
-    cdef double complex[:] c1_im_coeff = np.zeros(nt, dtype=np.complex128)
     cdef double complex[:] c2_term = np.zeros(nt, dtype=np.complex128)
-    cdef double complex[:] c2_re_coeff = np.zeros(nt, dtype=np.complex128)
-    cdef double complex[:] c2_im_coeff = np.zeros(nt, dtype=np.complex128)
-    cdef double denom
+    cdef double denom, a, a_denom_sum, E_diff
 
-    cdef double complex[:] e_bgt = np.empty(nt, dtype=np.complex128)
-    cdef double complex[:] e_gdt = np.empty(nt, dtype=np.complex128)
-
-    cdef double[:, :, :] E_diff = np.zeros((nt, hilbert_dim, hilbert_dim), dtype=np.float64)
-    for i_t in range(nt):
-        for i in range(hilbert_dim):
-            for k in range(hilbert_dim):
-                E_diff[i_t, i, k] = (E[i] - E[k]) * t[i_t]
-
-    # make the exp safe (-708.4 is the magic number according to docs. <-20 should be more than enough though...)
-    if 0.01 / tau_c < 20.:
-        for i in range(nt):
-            e_tau_decay[i] = exp(-t[i]/tau_c)
-    else:
-        e_tau_decay[i] = 0.
+    cdef double[:, :, :] E_diff_t = np.zeros((nt, hilbert_dim, hilbert_dim), dtype=np.float64)
+    for i in range(hilbert_dim):
+        for k in range(hilbert_dim):
+            E_diff = E[i] - E[k]
+            for i_t in range(nt):
+                E_diff_t[i_t, i, k] = E_diff * t[i_t]
 
     for sigma in range(3):
         for i in range(nt):
@@ -363,7 +339,7 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
                         c0 = C_abg(alpha, beta, delta, sigma, sigma_prime)
                         if c0 == 0:
                             continue
-                        c0_coeff = c0 * F_ab[alpha, beta]
+                        c0_coeff = c0
 
                         for gamma in range(hilbert_dim):
                             c1 = C_abg(gamma, delta, beta, sigma, sigma_prime)
@@ -373,50 +349,33 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
 
                             for i in range(nt):
                                 # re-initalize c1_term and c2_term
-                                c1_term[i] = 0
-                                c2_term[i] = 0
-
-                            for i in range(nt):
-                                e_gdt[i] = cos(E_diff[i, gamma, delta]) + 1.j*sin(E_diff[i, gamma, delta])
+                                c1_term[i] = c1
+                                c2_term[i] = c2
 
                             if c1 != 0:
                                 denom = E[gamma] - E[delta] + E[alpha] - E[beta]
                                 if abs(denom) > C_EPS:
                                     for i in range(nt):
-                                        c1_im_coeff[i] = -1j * (cos(t[i] * denom) + 1j*sin(t[i] * denom) - 1) / denom
+                                        c1_term[i] *= -(1j * (cos(E_diff_t[i, alpha, delta]) - cos(E_diff_t[i, beta, gamma])) +
+                                                      (sin(E_diff_t[i, beta, gamma])- sin(E_diff_t[i, alpha, delta])) ) / denom
                                 else:
                                     for i in range(nt):
-                                        c1_im_coeff[i] = t[i]
-
-                                for i in range(nt):
-                                    c1_re_coeff[i] = F_ab[gamma, delta] * (e_gdt[i] * e_tau_decay[i] - 1)
-
-                                for i in range(nt):
-                                    c1_term[i] = c1 * e_bgt[i] * (c1_re_coeff[i] + c1_im_coeff[i])
+                                        c1_term[i] *= t[i] * (cos(E_diff_t[i, beta, gamma]) + 1j * sin(E_diff_t[i, beta, gamma]))
 
                             if c2 != 0:
-                                # precalculate e_bgt
-                                for i in range(nt):
-                                    e_bgt[i] = cos(E_diff[i, beta, gamma]) + 1.j*sin(E_diff[i, beta, gamma])
-
                                 denom = E[alpha] - E[gamma]
                                 if abs(denom) > C_EPS:
                                     for i in range(nt):
-                                        c2_im_coeff[i] = 1j * (cos(E_diff[i, alpha, gamma]) +
-                                                               1.j*sin(E_diff[i, alpha, gamma]) - 1) / denom
+                                        c2_term[i] *= (1j * (cos(E_diff_t[i, alpha, delta]) - cos(E_diff_t[i, gamma, delta])) +
+                                                        (sin(E_diff_t[i, gamma, delta])- sin(E_diff_t[i, alpha, delta])) ) / denom
                                 else:
                                     for i in range(nt):
-                                        c2_im_coeff[i] = -t[i]
-
-                                for i in range(nt):
-                                    c2_re_coeff[i] = -F_ab[beta, gamma] * (e_bgt[i] * e_tau_decay[i] - 1)
-                                for i in range(nt):
-                                    c2_term[i] = c2 * e_gdt[i] * (c2_re_coeff[i] + c2_im_coeff[i])
+                                        c2_term[i] *= -t[i] * (cos(E_diff_t[i, gamma, delta]) + 1j * sin(E_diff_t[i, gamma, delta]))
 
                             for i in range(nt):
                                 this_sigma_prime_sum[i] += (c0_coeff * (c1_term[i] + c2_term[i])).real
             for i in range(nt):
-                this_sigma_prime_sum[i] *= B_var
+                this_sigma_prime_sum[i] *= B_var * tau_c * 2
                 sigma_prime_sum[i] += this_sigma_prime_sum[i]
         for i in range(nt):
             sigma_sum[i] += sigma_prime_sum[i] / 3.0
@@ -425,4 +384,3 @@ def calculate_second_order(double complex[:, :] R, double complex[:, :] Rinv, do
         sigma_sum[i] *= 1.0 / hilbert_dim
 
     return sigma_sum
-
